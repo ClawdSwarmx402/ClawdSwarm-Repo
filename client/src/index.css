@@ -7,3 +7,16 @@ body, html {
   overflow-x: hidden;
   font-family: 'Space Grotesk', sans-serif;
 }
+
+.sky-gradient {
+  background: linear-gradient(180deg, #87CEEB 0%, #a8e6f0 100%);
+}
+
+@keyframes sun-pulse {
+  0%, 100% { r: 35; opacity: 0.8; }
+  50%      { r: 38; opacity: 1; }
+}
+
+.sun-glow {
+  animation: sun-pulse 3s ease-in-out infinite;
+}
