@@ -1,25 +1,339 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-body, html {
-  margin: 0;
-  padding: 0;
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-primary-border: hsl(var(--primary-border));
+  --color-accent-border: hsl(var(--accent-border));
+  --color-card-border: hsl(var(--card-border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+  --color-sidebar-primary-border: var(--sidebar-primary-border);
+  --color-sidebar-accent-border: var(--sidebar-accent-border);
+  --color-primary-border: var(--primary-border);
+  --color-secondary-border: var(--secondary-border);
+  --color-muted-border: var(--muted-border);
+  --color-accent-border: var(--accent-border);
+  --color-destructive-border: var(--destructive-border);
+}
+
+/* Horizontal Scroll Styles based on User Input */
+body, html { 
+  margin: 0; 
+  padding: 0; 
   min-height: 100vh;
-  overflow-x: hidden;
-  font-family: 'Space Grotesk', sans-serif;
+  overflow-x: hidden; 
+  /* Allow vertical scroll */
 }
 
-.sky-gradient {
-  background: linear-gradient(180deg, #87CEEB 0%, #a8e6f0 100%);
-  transition: background 0.3s ease;
+.horizontal-scene { 
+  /* Not used in the GSAP pin version anymore, kept for legacy clean up later if needed */
+  display: none;
 }
 
-@keyframes sun-pulse {
-  0%, 100% { r: 35; opacity: 0.8; }
-  50%      { r: 38; opacity: 1; }
+.scenes { 
+  display: flex; 
+  width: 400vw; 
+  height: 100%; 
 }
 
-.sun-glow {
-  animation: sun-pulse 3s ease-in-out infinite;
+.scene { 
+  flex: 0 0 100vw; 
+  height: 100vh; 
+  position: relative; 
+  scroll-snap-align: start; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  flex-direction: column; 
+  color: #fff; 
+  text-shadow: 0 2px 6px #000; 
+  /* Fallback or base gradient if not overridden */
+  background: linear-gradient(to bottom, #87ceeb 60%, #f4a460 100%); 
+}
+
+.scene.start { 
+  background: linear-gradient(#87ceeb, #b0e0e6); 
+}
+
+.scene.waves-area, 
+.scene.castle-area { 
+  background: linear-gradient(to bottom, #87ceeb 50%, #00bfff 70%, #f4a460 100%); 
+}
+
+.scene.end { 
+  background: #87ceeb; 
+}
+
+.waves { 
+  position: absolute; 
+  bottom: 0; 
+  width: 100%; 
+  height: 40vh; 
+  z-index: 1; 
+}
+
+.wave { 
+  animation: wave 6s ease-in-out infinite alternate; 
+  transform-origin: center; 
+}
+
+@keyframes wave { 
+  0% { d: path("M0,150 Q300,50 600,150 T1200,150 V300 H0 Z"); } 
+  100% { d: path("M0,150 Q300,250 600,150 T1200,150 V300 H0 Z"); } 
+}
+
+.obstacle { 
+  position: absolute; 
+  bottom: 20vh; 
+  z-index: 2; 
+}
+
+#crab { 
+  position: fixed; 
+  bottom: 25vh; 
+  left: 5vw; 
+  z-index: 10; 
+  transition: transform 0.1s; 
+}
+
+.legs .leg { 
+  animation: walk 0.6s alternate infinite; 
+  transform-origin: center; 
+}
+
+.legs .leg:nth-child(2n) { 
+  animation-delay: 0.3s; 
+}
+
+@keyframes walk { 
+  from { transform: rotate(-15deg); } 
+  to { transform: rotate(15deg); } 
+}
+
+.clouds { 
+  position: fixed; 
+  top: 0; 
+  width: 100%; 
+  height: 30vh; 
+  z-index: 0; 
+  pointer-events: none; 
+}
+
+.cloud { 
+  animation: drift 40s linear infinite; 
+}
+
+@keyframes drift { 
+  0% { transform: translateX(-20%); } 
+  100% { transform: translateX(120%); } 
+}
+
+#home-screen { 
+  text-align: center; 
+  opacity: 0; 
+  transition: opacity 1.5s; 
+}
+
+#home-screen.visible {
+  opacity: 1;
+}
+
+#home-screen h1 { 
+  font-size: 4rem; 
+  margin: 0; 
+}
+
+#home-screen button { 
+  font-size: 2rem; 
+  padding: 1.2rem 3rem; 
+  background: #ff9800; 
+  border: none; 
+  border-radius: 50px; 
+  color: #fff; 
+  cursor: pointer; 
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3); 
+}
+
+/* Light Mode Variables */
+:root {
+  --background: 210 40% 98%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 221 83% 53%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 210 40% 96%;
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 222 84% 4.9%;
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: 222 47% 11%;
+  --foreground: 210 40% 98%;
+  --card: 222 47% 11%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 47% 11%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 210 40% 98%;
+  --primary-foreground: 222 47% 11%;
+  --secondary: 217 32% 17%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217 32% 17%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 217 32% 17%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62% 30%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217 32% 17%;
+  --input: 217 32% 17%;
+  --ring: 212 26% 83%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+/* Crab Animation States */
+@keyframes shake {
+  0%, 100% { transform: translateX(-50%) rotate(0deg); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-50%) rotate(-5deg) translateY(-2px); }
+  20%, 40%, 60%, 80% { transform: translateX(-50%) rotate(5deg) translateY(-2px); }
+}
+
+@keyframes spin-slow {
+  0% { transform: translateX(-50%) rotate(0deg) scale(1); }
+  25% { transform: translateX(-50%) rotate(-10deg) scale(1.05); }
+  50% { transform: translateX(-50%) rotate(0deg) scale(1); }
+  75% { transform: translateX(-50%) rotate(10deg) scale(1.05); }
+  100% { transform: translateX(-50%) rotate(0deg) scale(1); }
+}
+
+@keyframes celebrate {
+  0%, 100% { transform: translateX(-50%) translateY(0) rotate(0deg); }
+  10% { transform: translateX(-50%) translateY(-15px) rotate(-5deg); }
+  20% { transform: translateX(-50%) translateY(0) rotate(5deg); }
+  30% { transform: translateX(-50%) translateY(-10px) rotate(-3deg); }
+  40% { transform: translateX(-50%) translateY(0) rotate(3deg); }
+  50% { transform: translateX(-50%) translateY(-5px) scale(1.1); }
+  60% { transform: translateX(-50%) translateY(0) scale(1); }
+  70% { transform: translateX(-50%) translateY(-8px) rotate(-2deg); }
+  80% { transform: translateX(-50%) translateY(0) rotate(2deg); }
+  90% { transform: translateX(-50%) translateY(-3px); }
+}
+
+.animate-shake {
+  animation: shake 0.5s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 0.8s ease-in-out infinite;
+}
+
+.animate-celebrate {
+  animation: celebrate 1.5s ease-in-out infinite;
+}
+
+@keyframes patrol {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(120px); }
+}
+
+.guardian-crab {
+  position: absolute;
+  top: 10%;
+  left: 10%;
+  width: 180px;
+  opacity: 0.25;
+  filter: drop-shadow(0 0 20px rgba(0,0,0,0.6));
+  animation: patrol 25s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes roam {
+  0%   { transform: translate(0, 0) rotate(0deg); }
+  15%  { transform: translate(40px, 15px) rotate(2deg); }
+  30%  { transform: translate(-20px, 30px) rotate(-2deg); }
+  50%  { transform: translate(50px, 10px) rotate(3deg); }
+  65%  { transform: translate(15px, -10px) rotate(-2deg); }
+  80%  { transform: translate(-30px, 20px) rotate(1deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+@keyframes claw-snap-left {
+  0%, 70%, 100% { transform: rotate(0deg); }
+  80%           { transform: rotate(15deg); }
+  85%           { transform: rotate(-10deg); }
+}
+
+@keyframes claw-snap-right {
+  0%, 60%, 100% { transform: rotate(0deg); }
+  70%           { transform: rotate(-15deg); }
+  75%           { transform: rotate(10deg); }
+}
+
+.angry-giant-crab {
+  animation: roam 18s ease-in-out infinite;
+  filter: drop-shadow(0 10px 30px rgba(0,0,0,0.5));
+}
+
+.angry-claw-left {
+  animation: claw-snap-left 4s ease-in-out infinite;
+}
+
+.angry-claw-right {
+  animation: claw-snap-right 3.5s ease-in-out infinite;
 }
 
 .leg-anim-1 {
@@ -40,16 +354,6 @@ body, html {
   100% { transform: rotate(-3deg); }
 }
 
-@keyframes wave-drift {
-  0%   { transform: translateX(0); }
-  50%  { transform: translateX(-20px); }
-  100% { transform: translateX(0); }
-}
-
-.wave-back { animation: wave-drift 6s ease-in-out infinite; }
-.wave-mid { animation: wave-drift 4s ease-in-out infinite reverse; }
-.wave-front { animation: wave-drift 3s ease-in-out infinite; }
-
 /* Seagull flying */
 @keyframes seagull-fly {
   0%   { transform: translateY(0) translateX(0); }
@@ -67,7 +371,7 @@ body, html {
   animation: seagull-fly 8s ease-in-out infinite reverse;
 }
 
-/* Seal */
+/* Seal breathing */
 @keyframes seal-breathe {
   0%, 100% { transform: scaleY(1); }
   50%      { transform: scaleY(1.04) scaleX(1.02); }
@@ -78,7 +382,182 @@ body, html {
   transform-origin: bottom center;
 }
 
-/* Dog */
+/* Starfish spinning */
+@keyframes starfish-spin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.starfish-spin {
+  animation: starfish-spin 20s linear infinite;
+}
+
+.starfish-spin-slow {
+  animation: starfish-spin 35s linear infinite reverse;
+}
+
+/* Scorpion scuttling */
+@keyframes scorpion-scuttle {
+  0%, 100% { transform: translateX(0) scaleX(1); }
+  30%      { transform: translateX(40px) scaleX(1); }
+  50%      { transform: translateX(40px) scaleX(-1); }
+  80%      { transform: translateX(0) scaleX(-1); }
+  90%      { transform: translateX(0) scaleX(1); }
+}
+
+.scorpion-scuttle {
+  animation: scorpion-scuttle 12s ease-in-out infinite;
+}
+
+.scorpion-tail {
+  animation: scorpion-sting 3s ease-in-out infinite;
+  transform-origin: 55px 65px;
+}
+
+@keyframes scorpion-sting {
+  0%, 80%, 100% { transform: rotate(0deg); }
+  85%           { transform: rotate(-15deg); }
+  90%           { transform: rotate(5deg); }
+}
+
+/* Jellyfish floating */
+@keyframes jellyfish-float {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  33%      { transform: translateY(15px) translateX(10px); }
+  66%      { transform: translateY(-10px) translateX(-5px); }
+}
+
+.jellyfish-float {
+  animation: jellyfish-float 8s ease-in-out infinite;
+}
+
+@keyframes jelly-tentacle-1 {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(5px); }
+}
+
+@keyframes jelly-tentacle-2 {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(-4px); }
+}
+
+.jelly-tentacle-1 {
+  animation: jelly-tentacle-1 3s ease-in-out infinite;
+}
+
+.jelly-tentacle-2 {
+  animation: jelly-tentacle-2 2.5s ease-in-out infinite;
+}
+
+/* Palm tree sway */
+@keyframes palm-sway {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(3deg); }
+}
+
+.palm-sway {
+  animation: palm-sway 5s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+/* Smoke puffs from Fish & Chips */
+@keyframes smoke-rise {
+  0%   { transform: translateY(0) scale(1); opacity: 0.4; }
+  100% { transform: translateY(-25px) scale(2); opacity: 0; }
+}
+
+.smoke-puff {
+  animation: smoke-rise 3s ease-out infinite;
+}
+
+.smoke-puff-2 {
+  animation: smoke-rise 4s ease-out 1.5s infinite;
+}
+
+/* Sky gradient base */
+.sky-gradient {
+  background: linear-gradient(180deg, #87CEEB 0%, #a8e6f0 100%);
+  transition: background 0.3s ease;
+}
+
+/* Sun glow pulse */
+@keyframes sun-pulse {
+  0%, 100% { r: 35; opacity: 0.8; }
+  50%      { r: 38; opacity: 1; }
+}
+
+.sun-glow {
+  animation: sun-pulse 3s ease-in-out infinite;
+}
+
+@keyframes sun-ray-spin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Star twinkle */
+@keyframes star-twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50%      { opacity: 1; transform: scale(1.5); }
+}
+
+.star-twinkle {
+  animation: star-twinkle 2s ease-in-out infinite;
+}
+
+/* Wave animations */
+@keyframes wave-drift {
+  0%   { transform: translateX(0); }
+  50%  { transform: translateX(-20px); }
+  100% { transform: translateX(0); }
+}
+
+.wave-back { animation: wave-drift 6s ease-in-out infinite; }
+.wave-mid { animation: wave-drift 4s ease-in-out infinite reverse; }
+.wave-front { animation: wave-drift 3s ease-in-out infinite; }
+
+/* Sea turtle */
+@keyframes turtle-cross {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(80px); }
+}
+
+.turtle-cross {
+  animation: turtle-cross 25s ease-in-out infinite;
+}
+
+@keyframes turtle-flipper {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(15deg); }
+}
+
+.turtle-flipper-l {
+  animation: turtle-flipper 1.5s ease-in-out infinite;
+  transform-origin: 60px 80px;
+}
+
+.turtle-flipper-r {
+  animation: turtle-flipper 1.5s ease-in-out infinite reverse;
+  transform-origin: 100px 80px;
+}
+
+/* Dolphins */
+@keyframes dolphin-jump {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25%      { transform: translateY(-40px) rotate(-15deg); }
+  50%      { transform: translateY(-60px) rotate(-5deg); }
+  75%      { transform: translateY(-30px) rotate(10deg); }
+}
+
+.dolphin-jump {
+  animation: dolphin-jump 5s ease-in-out infinite;
+}
+
+.dolphin-jump-2 {
+  animation: dolphin-jump 6s ease-in-out 2s infinite;
+}
+
+/* Dog running */
 @keyframes dog-run {
   0%, 100% { transform: translateX(0); }
   50%      { transform: translateX(60px); }
@@ -122,207 +601,6 @@ body, html {
   animation: ball-bounce 0.8s ease-in-out infinite;
 }
 
-/* Palm tree */
-@keyframes palm-sway {
-  0%, 100% { transform: rotate(0deg); }
-  50%      { transform: rotate(3deg); }
-}
-
-.palm-sway {
-  animation: palm-sway 5s ease-in-out infinite;
-  transform-origin: bottom center;
-}
-
-/* Fish & chips smoke */
-@keyframes smoke-rise {
-  0%   { transform: translateY(0) scale(1); opacity: 0.4; }
-  100% { transform: translateY(-25px) scale(2); opacity: 0; }
-}
-
-.smoke-puff {
-  animation: smoke-rise 3s ease-out infinite;
-}
-
-.smoke-puff-2 {
-  animation: smoke-rise 4s ease-out 1.5s infinite;
-}
-
-/* Grass */
-@keyframes grass-sway {
-  0%, 100% { transform: rotate(-5deg); }
-  50%      { transform: rotate(5deg); }
-}
-
-.grass-sway {
-  animation: grass-sway 2s ease-in-out infinite;
-  transform-origin: bottom center;
-}
-
-/* Star twinkle */
-@keyframes star-twinkle {
-  0%, 100% { opacity: 0.3; transform: scale(1); }
-  50%      { opacity: 1; transform: scale(1.5); }
-}
-
-.star-twinkle {
-  animation: star-twinkle 2s ease-in-out infinite;
-}
-
-/* Wave wash */
-@keyframes wave-wash-surge {
-  0%   { transform: translateY(100%); opacity: 0; }
-  8%   { transform: translateY(60%); opacity: 0.6; }
-  20%  { transform: translateY(25%); opacity: 1; }
-  35%  { transform: translateY(15%); opacity: 1; }
-  45%  { transform: translateY(18%); opacity: 0.95; }
-  55%  { transform: translateY(22%); opacity: 0.85; }
-  70%  { transform: translateY(45%); opacity: 0.6; }
-  85%  { transform: translateY(75%); opacity: 0.3; }
-  100% { transform: translateY(100%); opacity: 0; }
-}
-
-.wave-wash-1 {
-  animation: wave-wash-surge 7s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
-}
-
-.wave-wash-2 {
-  animation: wave-wash-surge 7s cubic-bezier(0.25, 0.1, 0.25, 1) infinite 2.5s;
-}
-
-.wave-wash-3 {
-  animation: wave-wash-surge 7s cubic-bezier(0.25, 0.1, 0.25, 1) infinite 5s;
-}
-
-/* Angry crab */
-@keyframes roam {
-  0%   { transform: translate(0, 0) rotate(0deg); }
-  15%  { transform: translate(40px, 15px) rotate(2deg); }
-  30%  { transform: translate(-20px, 30px) rotate(-2deg); }
-  50%  { transform: translate(50px, 10px) rotate(3deg); }
-  65%  { transform: translate(15px, -10px) rotate(-2deg); }
-  80%  { transform: translate(-30px, 20px) rotate(1deg); }
-  100% { transform: translate(0, 0) rotate(0deg); }
-}
-
-@keyframes claw-snap-left {
-  0%, 70%, 100% { transform: rotate(0deg); }
-  80%           { transform: rotate(15deg); }
-  85%           { transform: rotate(-10deg); }
-}
-
-@keyframes claw-snap-right {
-  0%, 60%, 100% { transform: rotate(0deg); }
-  70%           { transform: rotate(-15deg); }
-  75%           { transform: rotate(10deg); }
-}
-
-.angry-giant-crab {
-  animation: roam 18s ease-in-out infinite;
-  filter: drop-shadow(0 10px 30px rgba(0,0,0,0.5));
-}
-
-.angry-claw-left {
-  animation: claw-snap-left 4s ease-in-out infinite;
-}
-
-.angry-claw-right {
-  animation: claw-snap-right 3.5s ease-in-out infinite;
-}
-
-/* Scorpion */
-@keyframes scorpion-scuttle {
-  0%, 100% { transform: translateX(0) scaleX(1); }
-  30%      { transform: translateX(40px) scaleX(1); }
-  50%      { transform: translateX(40px) scaleX(-1); }
-  80%      { transform: translateX(0) scaleX(-1); }
-  90%      { transform: translateX(0) scaleX(1); }
-}
-
-.scorpion-scuttle {
-  animation: scorpion-scuttle 12s ease-in-out infinite;
-}
-
-.scorpion-tail {
-  animation: scorpion-sting 3s ease-in-out infinite;
-  transform-origin: 55px 65px;
-}
-
-@keyframes scorpion-sting {
-  0%, 80%, 100% { transform: rotate(0deg); }
-  85%           { transform: rotate(-15deg); }
-  90%           { transform: rotate(5deg); }
-}
-
-/* Jellyfish */
-@keyframes jellyfish-float {
-  0%, 100% { transform: translateY(0) translateX(0); }
-  33%      { transform: translateY(15px) translateX(10px); }
-  66%      { transform: translateY(-10px) translateX(-5px); }
-}
-
-.jellyfish-float {
-  animation: jellyfish-float 8s ease-in-out infinite;
-}
-
-@keyframes jelly-tentacle-1 {
-  0%, 100% { transform: translateX(0); }
-  50%      { transform: translateX(5px); }
-}
-
-@keyframes jelly-tentacle-2 {
-  0%, 100% { transform: translateX(0); }
-  50%      { transform: translateX(-4px); }
-}
-
-.jelly-tentacle-1 {
-  animation: jelly-tentacle-1 3s ease-in-out infinite;
-}
-
-.jelly-tentacle-2 {
-  animation: jelly-tentacle-2 2.5s ease-in-out infinite;
-}
-
-/* Sea turtle */
-@keyframes turtle-cross {
-  0%, 100% { transform: translateX(0); }
-  50%      { transform: translateX(80px); }
-}
-
-.turtle-cross {
-  animation: turtle-cross 25s ease-in-out infinite;
-}
-
-@keyframes turtle-flipper {
-  0%, 100% { transform: rotate(0deg); }
-  50%      { transform: rotate(15deg); }
-}
-
-.turtle-flipper-l {
-  animation: turtle-flipper 1.5s ease-in-out infinite;
-  transform-origin: 60px 80px;
-}
-
-.turtle-flipper-r {
-  animation: turtle-flipper 1.5s ease-in-out infinite reverse;
-  transform-origin: 100px 80px;
-}
-
-/* Dolphins */
-@keyframes dolphin-jump {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  25%      { transform: translateY(-40px) rotate(-15deg); }
-  50%      { transform: translateY(-60px) rotate(-5deg); }
-  75%      { transform: translateY(-30px) rotate(10deg); }
-}
-
-.dolphin-jump {
-  animation: dolphin-jump 5s ease-in-out infinite;
-}
-
-.dolphin-jump-2 {
-  animation: dolphin-jump 6s ease-in-out 2s infinite;
-}
-
 /* Hermit crabs */
 @keyframes hermit-scuttle {
   0%, 100% { transform: translateX(0) scaleX(1); }
@@ -340,21 +618,18 @@ body, html {
   animation: hermit-scuttle 14s ease-in-out 3s infinite;
 }
 
-/* Starfish */
-@keyframes starfish-spin {
-  0%   { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+/* Grass swaying */
+@keyframes grass-sway {
+  0%, 100% { transform: rotate(-5deg); }
+  50%      { transform: rotate(5deg); }
 }
 
-.starfish-spin {
-  animation: starfish-spin 20s linear infinite;
+.grass-sway {
+  animation: grass-sway 2s ease-in-out infinite;
+  transform-origin: bottom center;
 }
 
-.starfish-spin-slow {
-  animation: starfish-spin 35s linear infinite reverse;
-}
-
-/* Volleyball */
+/* Volleyball bounce */
 @keyframes volleyball-bounce {
   0%, 100% { transform: translateY(0); }
   40%      { transform: translateY(-25px) translateX(10px); }
@@ -365,7 +640,7 @@ body, html {
   animation: volleyball-bounce 3s ease-in-out infinite;
 }
 
-/* Lighthouse */
+/* Lighthouse glow */
 @keyframes lighthouse-glow {
   0%, 100% { fill: #f9e79f; opacity: 0.6; }
   50%      { fill: #f1c40f; opacity: 1; }
@@ -375,7 +650,7 @@ body, html {
   animation: lighthouse-glow 2s ease-in-out infinite;
 }
 
-/* Treasure */
+/* Treasure glint */
 @keyframes treasure-glint {
   0%, 80%, 100% { opacity: 0.4; transform: scale(1); }
   90%           { opacity: 1; transform: scale(1.5); }
@@ -485,7 +760,7 @@ body, html {
 .data-particle-2 { animation: data-float-2 4s ease-in-out infinite; }
 .data-particle-3 { animation: data-float-3 3.5s ease-in-out infinite; }
 
-/* Visor scan */
+/* Visor scan line */
 @keyframes visor-scan {
   0%   { transform: translateY(-20px); opacity: 0.3; }
   50%  { transform: translateY(20px); opacity: 0.8; }
@@ -494,6 +769,30 @@ body, html {
 
 .visor-scan {
   animation: visor-scan 2.5s ease-in-out infinite;
+}
+
+@keyframes wave-wash-surge {
+  0%   { transform: translateY(100%); opacity: 0; }
+  8%   { transform: translateY(60%); opacity: 0.6; }
+  20%  { transform: translateY(25%); opacity: 1; }
+  35%  { transform: translateY(15%); opacity: 1; }
+  45%  { transform: translateY(18%); opacity: 0.95; }
+  55%  { transform: translateY(22%); opacity: 0.85; }
+  70%  { transform: translateY(45%); opacity: 0.6; }
+  85%  { transform: translateY(75%); opacity: 0.3; }
+  100% { transform: translateY(100%); opacity: 0; }
+}
+
+.wave-wash-1 {
+  animation: wave-wash-surge 7s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+}
+
+.wave-wash-2 {
+  animation: wave-wash-surge 7s cubic-bezier(0.25, 0.1, 0.25, 1) infinite 2.5s;
+}
+
+.wave-wash-3 {
+  animation: wave-wash-surge 7s cubic-bezier(0.25, 0.1, 0.25, 1) infinite 5s;
 }
 
 @media (orientation: landscape) and (min-width: 1025px) {
