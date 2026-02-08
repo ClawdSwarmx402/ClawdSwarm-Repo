@@ -6,8 +6,7 @@ import {
   X402_HEADERS,
   X402_VERSION,
   parsePaymentHeader,
-  encodePaymentHeader,
-} from "../shared/x402";
+} from "@shared/x402";
 import crypto from "crypto";
 
 export interface X402GateConfig {

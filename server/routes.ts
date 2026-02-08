@@ -3,6 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { initStore, findByDeploymentHash, upsertByDeploymentHash, updateAgent, listAgents } from "./agentStore";
 import { moltbookRegister, moltbookPost } from "./moltbookClient";
+import { createX402Router } from "./x402Routes";
+import { initLedger } from "./paymentLedger";
 import crypto from "crypto";
 
 const CRAB_ADJECTIVES = ['Pinchy', 'Sideways', 'ShellShock', 'Clawdius', 'RaveCrab', 'MoltMaster', 'Crustacean', 'Scuttle', 'BubbleBlow', 'TidePool', 'Clawster', 'Shellby', 'Pinchington', 'Crabtastic', 'Moltacious'];
@@ -29,6 +31,10 @@ export async function registerRoutes(
 ): Promise<Server> {
 
   await initStore();
+  initLedger();
+
+  // mount x402 payment protocol routes
+  app.use(createX402Router());
 
   app.post("/api/agents/deploy", async (req, res) => {
     try {

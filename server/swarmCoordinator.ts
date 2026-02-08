@@ -1,4 +1,4 @@
-import { MoltStage } from "../shared/moltTiers";
+import { MoltStage } from "@shared/moltTiers";
 import crypto from "crypto";
 
 export enum TaskType {
@@ -53,7 +53,7 @@ export class Coordinator {
     const now = Date.now();
     const available: SwarmTask[] = [];
 
-    for (const task of this.tasks.values()) {
+    for (const task of Array.from(this.tasks.values())) {
       if (task.status !== "open") continue;
       if (task.deadline < now) {
         task.status = "expired";

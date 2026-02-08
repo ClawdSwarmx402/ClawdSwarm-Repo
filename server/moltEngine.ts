@@ -3,10 +3,10 @@ import {
   MOLT_STAGE_NAMES,
   MOLT_REQUIREMENTS,
   MOLT_UNLOCKS,
-  AgentStats,
+  type AgentStats,
   canMolt,
   getCooldownRemaining,
-} from "../shared/moltTiers";
+} from "@shared/moltTiers";
 
 export enum DecayStatus {
   HEALTHY = "healthy",
@@ -115,7 +115,7 @@ export class MoltEngine {
 
     const eligible = canMolt(state.currentStage, stats) && cooldownMs === 0;
 
-    return { eligible, nextStage, requirements: req, progress, cooldownMs };
+    return { eligible, nextStage, requirements: req as unknown as Record<string, unknown>, progress, cooldownMs };
   }
 
   executeMolt(agentHash: string): { success: boolean; stage?: MoltStage; error?: string } {

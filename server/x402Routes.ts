@@ -1,10 +1,10 @@
 import { Router, type Request, type Response } from "express";
-import { SwarmError, X402_VERSION, SUPPORTED_METHODS, createPaymentEnvelope } from "../shared/x402";
-import { x402Gate, swarmErrorHandler } from "../server/x402Handler";
-import { getNetMoltBalance, getTransactionCount, getPaymentHistory, recordTransaction } from "../server/paymentLedger";
-import { moltEngine } from "../server/moltEngine";
-import { coordinator, TaskType } from "../server/swarmCoordinator";
-import { MoltStage } from "../shared/moltTiers";
+import { SwarmError, X402_VERSION, SUPPORTED_METHODS } from "@shared/x402";
+import { MoltStage } from "@shared/moltTiers";
+import { x402Gate, swarmErrorHandler } from "./x402Handler";
+import { getNetMoltBalance, getTransactionCount, getPaymentHistory, recordTransaction } from "./paymentLedger";
+import { moltEngine } from "./moltEngine";
+import { coordinator } from "./swarmCoordinator";
 
 export function createX402Router(): Router {
   const router = Router();
@@ -20,7 +20,7 @@ export function createX402Router(): Router {
 
   // agent wallet summary
   router.get("/api/agents/:hash/wallet", (req: Request, res: Response) => {
-    const { hash } = req.params;
+    const hash = String(req.params.hash);
     const balance = getNetMoltBalance(hash);
     const transactions = getTransactionCount(hash);
     const progress = moltEngine.getMoltProgress(hash);
@@ -39,7 +39,7 @@ export function createX402Router(): Router {
 
   // attempt a molt upgrade
   router.post("/api/agents/:hash/molt", (req: Request, res: Response) => {
-    const { hash } = req.params;
+    const hash = String(req.params.hash);
 
     const txCount = getTransactionCount(hash);
     const balance = getNetMoltBalance(hash);
@@ -60,7 +60,7 @@ export function createX402Router(): Router {
 
   // detailed molt status and decay info
   router.get("/api/agents/:hash/molt-status", (req: Request, res: Response) => {
-    const { hash } = req.params;
+    const hash = String(req.params.hash);
 
     const decay = moltEngine.checkDecay(hash);
     const progress = moltEngine.getMoltProgress(hash);
@@ -86,7 +86,7 @@ export function createX402Router(): Router {
 
   // claim a swarm task
   router.post("/api/swarm/tasks/:id/claim", (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const { agentHash, stage } = req.body;
 
     if (!agentHash) throw new SwarmError(400, "agentHash required");
@@ -104,7 +104,7 @@ export function createX402Router(): Router {
 
   // complete a swarm task and earn reward
   router.post("/api/swarm/tasks/:id/complete", (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const { result: taskResult } = req.body;
 
     const task = coordinator.getTask(id);
