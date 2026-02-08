@@ -48,3 +48,111 @@ body, html {
 .wave-back { animation: wave-drift 6s ease-in-out infinite; }
 .wave-mid { animation: wave-drift 4s ease-in-out infinite reverse; }
 .wave-front { animation: wave-drift 3s ease-in-out infinite; }
+
+/* Seagull flying */
+@keyframes seagull-fly {
+  0%   { transform: translateY(0) translateX(0); }
+  25%  { transform: translateY(-20px) translateX(30px); }
+  50%  { transform: translateY(5px) translateX(60px); }
+  75%  { transform: translateY(-15px) translateX(30px); }
+  100% { transform: translateY(0) translateX(0); }
+}
+
+.seagull-fly {
+  animation: seagull-fly 6s ease-in-out infinite;
+}
+
+.seagull-fly-2 {
+  animation: seagull-fly 8s ease-in-out infinite reverse;
+}
+
+/* Seal */
+@keyframes seal-breathe {
+  0%, 100% { transform: scaleY(1); }
+  50%      { transform: scaleY(1.04) scaleX(1.02); }
+}
+
+.seal-breathe {
+  animation: seal-breathe 4s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+/* Dog */
+@keyframes dog-run {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(60px); }
+}
+
+.dog-run {
+  animation: dog-run 8s ease-in-out infinite;
+}
+
+@keyframes dog-leg {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(20deg); }
+}
+
+.dog-leg-1 {
+  animation: dog-leg 0.5s ease-in-out infinite;
+  transform-origin: top center;
+}
+
+.dog-leg-2 {
+  animation: dog-leg 0.5s ease-in-out infinite reverse;
+  transform-origin: top center;
+}
+
+@keyframes dog-tail-wag {
+  0%, 100% { transform: rotate(-10deg); }
+  50%      { transform: rotate(20deg); }
+}
+
+.dog-tail {
+  animation: dog-tail-wag 0.4s ease-in-out infinite;
+  transform-origin: 105px 45px;
+}
+
+@keyframes ball-bounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-15px); }
+}
+
+.ball-bounce {
+  animation: ball-bounce 0.8s ease-in-out infinite;
+}
+
+/* Palm tree */
+@keyframes palm-sway {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(3deg); }
+}
+
+.palm-sway {
+  animation: palm-sway 5s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+/* Fish & chips smoke */
+@keyframes smoke-rise {
+  0%   { transform: translateY(0) scale(1); opacity: 0.4; }
+  100% { transform: translateY(-25px) scale(2); opacity: 0; }
+}
+
+.smoke-puff {
+  animation: smoke-rise 3s ease-out infinite;
+}
+
+.smoke-puff-2 {
+  animation: smoke-rise 4s ease-out 1.5s infinite;
+}
+
+/* Grass */
+@keyframes grass-sway {
+  0%, 100% { transform: rotate(-5deg); }
+  50%      { transform: rotate(5deg); }
+}
+
+.grass-sway {
+  animation: grass-sway 2s ease-in-out infinite;
+  transform-origin: bottom center;
+}
