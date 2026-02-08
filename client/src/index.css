@@ -20,3 +20,31 @@ body, html {
 .sun-glow {
   animation: sun-pulse 3s ease-in-out infinite;
 }
+
+.leg-anim-1 {
+  animation: leg-walk-1 0.8s ease-in-out infinite alternate;
+}
+
+.leg-anim-2 {
+  animation: leg-walk-2 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes leg-walk-1 {
+  0%   { transform: rotate(-3deg); }
+  100% { transform: rotate(3deg); }
+}
+
+@keyframes leg-walk-2 {
+  0%   { transform: rotate(3deg); }
+  100% { transform: rotate(-3deg); }
+}
+
+@keyframes wave-drift {
+  0%   { transform: translateX(0); }
+  50%  { transform: translateX(-20px); }
+  100% { transform: translateX(0); }
+}
+
+.wave-back { animation: wave-drift 6s ease-in-out infinite; }
+.wave-mid { animation: wave-drift 4s ease-in-out infinite reverse; }
+.wave-front { animation: wave-drift 3s ease-in-out infinite; }
