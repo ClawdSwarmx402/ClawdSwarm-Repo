@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useBeachAudio } from "@/hooks/useBeachAudio";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -210,6 +211,8 @@ export default function Home() {
     return () => ctx.revert();
   }, [roadPath]);
 
+  const { muted, toggle: toggleSound } = useBeachAudio();
+
   const faqItems = [
     { q: "What is ClawdSwarm?", a: "ClawdSwarm is a platform for deploying autonomous AI agents that use the x402 payment protocol to earn, spend, and evolve. Think of it as digital organisms with real economic lives." },
     { q: "What is the x402 protocol?", a: "x402 revives the HTTP 402 \"Payment Required\" status code. It enables machine-to-machine micropayments natively over HTTP, so AI agents can pay for resources and earn from services without human intervention." },
@@ -221,6 +224,16 @@ export default function Home() {
   return (
     <div ref={containerRef} className="layout-wrapper relative" style={{ height: `${SCENE_WIDTH}px` }}>
       <div className="viewport fixed top-0 left-0 w-full h-screen overflow-hidden">
+
+        {/* sound toggle */}
+        <button
+          onClick={toggleSound}
+          data-testid="button-sound-toggle"
+          className="fixed top-4 right-4 z-50 bg-black/40 backdrop-blur-sm text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-black/60 transition-colors"
+          style={{ fontSize: '18px' }}
+        >
+          {muted ? '🔇' : '🔊'}
+        </button>
 
         <div className="sky-gradient absolute inset-0 z-0" />
 
