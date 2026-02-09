@@ -4,7 +4,8 @@ import { storage } from "./storage";
 import { initStore, findByDeploymentHash, upsertByDeploymentHash, updateAgent, listAgents } from "./agentStore";
 import { moltbookRegister, moltbookPost } from "./moltbookClient";
 import { createX402Router } from "./x402Routes";
-import { initLedger } from "./paymentLedger";
+import { initLedger, getNetMoltBalance, getTransactionCount, getPaymentHistory } from "./paymentLedger";
+import { moltEngine } from "./moltEngine";
 import crypto from "crypto";
 
 const CRAB_ADJECTIVES = ['Pinchy', 'Sideways', 'ShellShock', 'Clawdius', 'RaveCrab', 'MoltMaster', 'Crustacean', 'Scuttle', 'BubbleBlow', 'TidePool', 'Clawster', 'Shellby', 'Pinchington', 'Crabtastic', 'Moltacious'];
@@ -59,7 +60,6 @@ export async function registerRoutes(
 
       const description = [persona && `Persona: ${persona}`, mission && `Mission: ${mission}`].filter(Boolean).join("\n");
       const mb = await moltbookRegister({ name, description, avatar_url });
-      console.log("MB REGISTER RESPONSE:", mb);
 
       await upsertByDeploymentHash(deploymentHash, {
         name,
@@ -279,6 +279,104 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/dashboard", async (_req, res) => {
+    try {
+      const agents = await listAgents();
+      const safeAgents = agents.map(({ moltbookApiKey, ...rest }) => {
+        const molt = moltEngine.getMoltProgress(rest.deploymentHash);
+        const decay = moltEngine.checkDecay(rest.deploymentHash);
+        const eligibility = moltEngine.checkMoltEligibility(rest.deploymentHash);
+        const balance = getNetMoltBalance(rest.deploymentHash);
+        const txCount = getTransactionCount(rest.deploymentHash);
+        const history = getPaymentHistory(rest.deploymentHash, 10);
+
+        const lastPost = rest.posting?.lastPostAt ? new Date(rest.posting.lastPostAt) : null;
+        const nextPost = lastPost
+          ? new Date(lastPost.getTime() + (rest.posting?.cadenceMins || 60) * 60_000)
+          : null;
+        const backoffUntil = rest.posting?.backoffUntil ? new Date(rest.posting.backoffUntil) : null;
+        const isBackedOff = backoffUntil && backoffUntil > new Date();
+
+        return {
+          ...rest,
+          molt: {
+            stage: molt.currentStage,
+            stageName: molt.stageName,
+            decayStatus: decay,
+            progress: molt.progress,
+            unlocks: molt.unlocks,
+            eligible: eligibility.eligible,
+            cooldownMs: eligibility.cooldownMs,
+            requirements: eligibility.requirements,
+          },
+          wallet: {
+            balance,
+            totalTransactions: txCount,
+            recentTransactions: history,
+          },
+          health: {
+            lastPostAt: rest.posting?.lastPostAt || null,
+            nextPostAt: isBackedOff ? backoffUntil!.toISOString() : nextPost?.toISOString() || null,
+            failures: rest.posting?.failures || 0,
+            isBackedOff: !!isBackedOff,
+            backoffUntil: backoffUntil?.toISOString() || null,
+            cadenceMins: rest.posting?.cadenceMins || 60,
+          },
+        };
+      });
+
+      const totalAgents = agents.length;
+      const activeAgents = agents.filter(a => a.status === "active").length;
+      const claimedAgents = agents.filter(a => a.status === "claimed").length;
+      const pendingAgents = agents.filter(a => a.status === "claim_ready").length;
+
+      const stageDistribution: Record<string, number> = { Larva: 0, Juvenile: 0, "Sub-adult": 0, Adult: 0, Alpha: 0 };
+      for (const a of safeAgents) {
+        stageDistribution[a.molt.stageName] = (stageDistribution[a.molt.stageName] || 0) + 1;
+      }
+
+      return res.json({
+        agents: safeAgents,
+        swarm: {
+          totalAgents,
+          activeAgents,
+          claimedAgents,
+          pendingAgents,
+          stageDistribution,
+        },
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.patch("/api/agents/:hash/config", async (req, res) => {
+    try {
+      const { hash } = req.params;
+      const { cadenceMins, enabled, mission } = req.body;
+      const agent = await findByDeploymentHash(hash);
+      if (!agent) return res.status(404).json({ error: "Agent not found" });
+
+      const patch: Partial<typeof agent> = {};
+      if (typeof mission === "string") patch.mission = mission;
+      if (typeof cadenceMins === "number" || typeof enabled === "boolean") {
+        patch.posting = {
+          ...agent.posting!,
+          enabled: typeof enabled === "boolean" ? enabled : agent.posting?.enabled ?? false,
+          cadenceMins: typeof cadenceMins === "number" ? Math.max(5, cadenceMins) : agent.posting?.cadenceMins ?? 60,
+          failures: agent.posting?.failures ?? 0,
+        };
+        if (enabled === true) patch.status = "active";
+        if (enabled === false && agent.status === "active") patch.status = "claimed";
+      }
+
+      const updated = await updateAgent(hash, patch);
+      return res.json({ ok: true, agent: updated });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
   app.get("/health", (_req, res) => res.json({ ok: true }));
 
   app.get("/debug", async (_req, res) => {
@@ -345,7 +443,6 @@ export async function registerRoutes(
       }
 
       const mb = await moltbookRegister({ name: agentName, description });
-      console.log("MB REGISTER RESPONSE:", mb);
 
       await upsertByDeploymentHash(deploymentHash, {
         name: mb.agent?.name ?? agentName,
