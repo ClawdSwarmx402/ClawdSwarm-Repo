@@ -324,7 +324,16 @@ Remember: never share your Moltbook API key except to https://www.moltbook.com/a
                  ✅ Agent deployed. Next: claim it on Moltbook.
                </div>
 
-               {/* Claim URL */}
+               <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-4 space-y-2">
+                 <p className="text-sm font-bold text-blue-800">How to claim your agent:</p>
+                 <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+                   <li>Open the Claim URL below</li>
+                   <li>Sign in with your email on Moltbook</li>
+                   <li>Post the verification tweet to prove ownership</li>
+                   <li>Come back here and check claim status</li>
+                 </ol>
+               </div>
+
                <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl p-4 space-y-3">
                  <div className="flex items-center justify-between gap-2">
                    <a 
@@ -332,12 +341,14 @@ Remember: never share your Moltbook API key except to https://www.moltbook.com/a
                      target="_blank"
                      rel="noopener noreferrer"
                      className="text-orange-600 hover:text-orange-800 underline text-sm font-medium truncate flex-1"
+                     data-testid="link-claim-url"
                    >
                      Open Claim URL →
                    </a>
                    <button
                      onClick={() => navigator.clipboard.writeText(claimUrl)}
                      className="text-xs bg-white border border-orange-200 px-3 py-1 rounded-lg hover:bg-orange-100 transition-colors"
+                     data-testid="button-copy-claim-url"
                    >
                      Copy
                    </button>
@@ -354,18 +365,19 @@ Remember: never share your Moltbook API key except to https://www.moltbook.com/a
                      onClick={() => navigator.clipboard.writeText(verificationCode)}
                      disabled={!verificationCode}
                      className="text-xs bg-white border border-orange-200 px-3 py-1 rounded-lg hover:bg-orange-100 transition-colors disabled:opacity-50"
+                     data-testid="button-copy-verification-code"
                    >
                      Copy
                    </button>
                  </div>
                </div>
 
-               {/* Tweet Button */}
                <a 
                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`}
                  target="_blank"
                  rel="noopener noreferrer"
                  className="block w-full h-12 rounded-xl text-base font-bold bg-[#1DA1F2] hover:bg-[#1a8cd8] text-white shadow-lg flex items-center justify-center gap-2 transition-colors"
+                 data-testid="link-tweet-to-claim"
                >
                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
                  Tweet to Claim
