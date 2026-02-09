@@ -116,7 +116,7 @@ function AgentCard({ agent, onToggle, onUpdateConfig }: { agent: any; onToggle: 
   const isActive = agent.status === "active" && agent.posting?.enabled;
 
   return (
-    <div className="bg-white rounded-2xl border-2 border-orange-100 shadow-sm overflow-hidden" data-testid={`card-agent-${agent.deploymentHash.slice(0, 8)}`}>
+    <div className="bg-white rounded-2xl border-2 border-orange-100 shadow-sm overflow-hidden">
       <div className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
@@ -179,7 +179,6 @@ function AgentCard({ agent, onToggle, onUpdateConfig }: { agent: any; onToggle: 
               className={`flex-1 h-8 rounded-lg text-xs font-bold text-white transition-colors ${
                 isActive ? "bg-red-500 hover:bg-red-600" : "bg-green-500 hover:bg-green-600"
               }`}
-              data-testid={`button-toggle-${agent.deploymentHash.slice(0, 8)}`}
             >
               {isActive ? "Pause" : "Activate"}
             </button>
@@ -187,14 +186,12 @@ function AgentCard({ agent, onToggle, onUpdateConfig }: { agent: any; onToggle: 
           <button
             onClick={() => setShowConfig(!showConfig)}
             className="h-8 px-3 rounded-lg text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
-            data-testid={`button-config-${agent.deploymentHash.slice(0, 8)}`}
           >
             Config
           </button>
           <button
             onClick={() => setShowLedger(!showLedger)}
             className="h-8 px-3 rounded-lg text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
-            data-testid={`button-ledger-${agent.deploymentHash.slice(0, 8)}`}
           >
             Ledger
           </button>
@@ -208,7 +205,6 @@ function AgentCard({ agent, onToggle, onUpdateConfig }: { agent: any; onToggle: 
                 value={mission}
                 onChange={(e) => setMission(e.target.value)}
                 className="w-full mt-1 px-2 py-1.5 text-xs rounded border border-orange-200 focus:outline-none focus:border-orange-400"
-                data-testid={`input-mission-${agent.deploymentHash.slice(0, 8)}`}
               />
             </div>
             <div>
@@ -219,7 +215,6 @@ function AgentCard({ agent, onToggle, onUpdateConfig }: { agent: any; onToggle: 
                 value={cadence}
                 onChange={(e) => setCadence(Number(e.target.value))}
                 className="w-full mt-1 px-2 py-1.5 text-xs rounded border border-orange-200 focus:outline-none focus:border-orange-400"
-                data-testid={`input-cadence-${agent.deploymentHash.slice(0, 8)}`}
               />
             </div>
             <button
@@ -228,7 +223,6 @@ function AgentCard({ agent, onToggle, onUpdateConfig }: { agent: any; onToggle: 
                 setShowConfig(false);
               }}
               className="w-full h-7 rounded text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white transition-colors"
-              data-testid={`button-save-config-${agent.deploymentHash.slice(0, 8)}`}
             >
               Save Changes
             </button>
