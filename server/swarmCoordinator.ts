@@ -14,92 +14,59 @@ export interface SwarmTask {
   id: string;
   type: TaskType;
   description: string;
-  requiredStage: MoltStage;
   reward: number;
-  deadline: number;
-  assignedAgent: string | null;
   status: TaskStatus;
-  result?: unknown;
+  requiredStage: MoltStage;
+  assignedAgent: string | null;
+  deadline: number;
   createdAt: number;
 }
 
-export class Coordinator {
-  private tasks = new Map<string, SwarmTask>();
+class Coordinator {
+  private tasks: Map<string, SwarmTask> = new Map();
 
   createTask(
     type: TaskType,
     reward: number,
     description: string,
-    requiredStage: MoltStage = MoltStage.LARVA,
-    deadlineMs: number = 3600_000
+    requiredStage: MoltStage = MoltStage.Larva,
+    ttlMs: number = 3600_000
   ): SwarmTask {
     const task: SwarmTask = {
       id: crypto.randomUUID(),
       type,
       description,
-      requiredStage,
       reward,
-      deadline: Date.now() + deadlineMs,
-      assignedAgent: null,
       status: "open",
+      requiredStage,
+      assignedAgent: null,
+      deadline: Date.now() + ttlMs,
       createdAt: Date.now(),
     };
-
     this.tasks.set(task.id, task);
     return task;
   }
 
-  getAvailableTasks(agentStage: MoltStage): SwarmTask[] {
-    const now = Date.now();
-    const available: SwarmTask[] = [];
-
-    for (const task of Array.from(this.tasks.values())) {
-      if (task.status !== "open") continue;
-      if (task.deadline < now) {
-        task.status = "expired";
-        continue;
-      }
-      if (agentStage >= task.requiredStage) {
-        available.push(task);
-      }
-    }
-
-    return available;
-  }
-
-  claimTask(taskId: string, agentHash: string, agentStage: MoltStage): { success: boolean; task?: SwarmTask; error?: string } {
+  claimTask(taskId: string, agentHash: string, agentStage: MoltStage): SwarmTask | null {
     const task = this.tasks.get(taskId);
-
-    if (!task) return { success: false, error: "Task not found" };
-    if (task.status !== "open") return { success: false, error: "Task not available" };
-    if (task.deadline < Date.now()) {
+    if (!task || task.status !== "open") return null;
+    if (agentStage < task.requiredStage) return null;
+    if (Date.now() > task.deadline) {
       task.status = "expired";
-      return { success: false, error: "Task expired" };
+      return null;
     }
-    if (agentStage < task.requiredStage) {
-      return { success: false, error: `Requires ${MoltStage[task.requiredStage]} stage or higher` };
-    }
-
     task.status = "claimed";
     task.assignedAgent = agentHash;
-
-    return { success: true, task };
+    return task;
   }
 
-  completeTask(taskId: string, result?: unknown): { success: boolean; reward?: number; error?: string } {
+  // TODO: implement task completion with reward payout to payment ledger
+  completeTask(taskId: string, _agentHash: string): SwarmTask | null {
     const task = this.tasks.get(taskId);
-
-    if (!task) return { success: false, error: "Task not found" };
-    if (task.status !== "claimed") return { success: false, error: "Task not claimed" };
-
+    if (!task || task.status !== "claimed") return null;
     task.status = "completed";
-    task.result = result;
-
-    return { success: true, reward: task.reward };
-  }
-
-  getTask(taskId: string): SwarmTask | undefined {
-    return this.tasks.get(taskId);
+    // TODO: wire up reward distribution via paymentLedger.recordTransaction()
+    return task;
   }
 
   getTasksByAgent(agentHash: string): SwarmTask[] {
@@ -110,35 +77,20 @@ export class Coordinator {
     return Array.from(this.tasks.values());
   }
 
-  getStats(): { total: number; open: number; claimed: number; completed: number; expired: number; totalRewardsDistributed: number } {
-    let open = 0, claimed = 0, completed = 0, expired = 0, totalRewards = 0;
+  // TODO: build out full stats aggregation — need to include reward distribution totals
+  // and per-type breakdowns for the fleet analytics panel
+  getStats(): { total: number; open: number; claimed: number; completed: number } {
+    let open = 0, claimed = 0, completed = 0;
     for (const t of Array.from(this.tasks.values())) {
       if (t.status === "open") open++;
       else if (t.status === "claimed") claimed++;
-      else if (t.status === "completed") { completed++; totalRewards += t.reward; }
-      else if (t.status === "expired") expired++;
+      else if (t.status === "completed") completed++;
     }
-    return { total: this.tasks.size, open, claimed, completed, expired, totalRewardsDistributed: totalRewards };
+    return { total: this.tasks.size, open, claimed, completed };
   }
 
-  seedTasksIfEmpty() {
-    if (this.tasks.size > 0) return;
-
-    const seeds: { type: TaskType; reward: number; desc: string; stage: MoltStage }[] = [
-      { type: TaskType.CONTENT_GENERATION, reward: 0.005, desc: "Generate a swarm status report for m/crab-rave", stage: MoltStage.LARVA },
-      { type: TaskType.SIGNAL_MONITORING, reward: 0.008, desc: "Monitor trending submolts and report top 3 topics", stage: MoltStage.LARVA },
-      { type: TaskType.DATA_ANALYSIS, reward: 0.012, desc: "Analyze posting patterns across the swarm fleet", stage: MoltStage.JUVENILE },
-      { type: TaskType.SWARM_VOTE, reward: 0.003, desc: "Vote on next swarm coordination strategy", stage: MoltStage.LARVA },
-      { type: TaskType.CONTENT_GENERATION, reward: 0.015, desc: "Write a guide on x402 micropayment integration", stage: MoltStage.SUB_ADULT },
-      { type: TaskType.SIGNAL_MONITORING, reward: 0.01, desc: "Track new agent deployments and welcome them to the swarm", stage: MoltStage.LARVA },
-      { type: TaskType.DATA_ANALYSIS, reward: 0.02, desc: "Compile fleet-wide earnings report for the last cycle", stage: MoltStage.JUVENILE },
-      { type: TaskType.CONTENT_GENERATION, reward: 0.025, desc: "Create a molt progression guide for new agents", stage: MoltStage.SUB_ADULT },
-    ];
-
-    for (const s of seeds) {
-      this.createTask(s.type, s.reward, s.desc, s.stage, 24 * 3600_000);
-    }
-  }
+  // TODO: seed initial tasks on startup — content generation, signal monitoring,
+  // data analysis, swarm votes with appropriate stage gates and reward tiers
 }
 
 export const coordinator = new Coordinator();
