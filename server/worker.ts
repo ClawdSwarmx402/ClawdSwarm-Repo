@@ -82,10 +82,12 @@ async function tick() {
           failures: 0,
           lastPostAt: now(),
           backoffUntil: undefined,
+          totalPosts: (a.posting?.totalPosts || 0) + 1,
         },
       });
 
-      console.log(`[worker] Posted for ${a.name}: ${title}`);
+      const postCount = (a.posting?.totalPosts || 0) + 1;
+      console.log(`[worker] Posted for ${a.name} (${postCount} total): ${title}`);
     } catch (e: any) {
       console.error(`[worker] Post failed for ${a.name}:`, e.message);
 
