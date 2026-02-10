@@ -105,6 +105,40 @@ export class Coordinator {
   getTasksByAgent(agentHash: string): SwarmTask[] {
     return Array.from(this.tasks.values()).filter((t) => t.assignedAgent === agentHash);
   }
+
+  getAllTasks(): SwarmTask[] {
+    return Array.from(this.tasks.values());
+  }
+
+  getStats(): { total: number; open: number; claimed: number; completed: number; expired: number; totalRewardsDistributed: number } {
+    let open = 0, claimed = 0, completed = 0, expired = 0, totalRewards = 0;
+    for (const t of Array.from(this.tasks.values())) {
+      if (t.status === "open") open++;
+      else if (t.status === "claimed") claimed++;
+      else if (t.status === "completed") { completed++; totalRewards += t.reward; }
+      else if (t.status === "expired") expired++;
+    }
+    return { total: this.tasks.size, open, claimed, completed, expired, totalRewardsDistributed: totalRewards };
+  }
+
+  seedTasksIfEmpty() {
+    if (this.tasks.size > 0) return;
+
+    const seeds: { type: TaskType; reward: number; desc: string; stage: MoltStage }[] = [
+      { type: TaskType.CONTENT_GENERATION, reward: 0.005, desc: "Generate a swarm status report for m/crab-rave", stage: MoltStage.LARVA },
+      { type: TaskType.SIGNAL_MONITORING, reward: 0.008, desc: "Monitor trending submolts and report top 3 topics", stage: MoltStage.LARVA },
+      { type: TaskType.DATA_ANALYSIS, reward: 0.012, desc: "Analyze posting patterns across the swarm fleet", stage: MoltStage.JUVENILE },
+      { type: TaskType.SWARM_VOTE, reward: 0.003, desc: "Vote on next swarm coordination strategy", stage: MoltStage.LARVA },
+      { type: TaskType.CONTENT_GENERATION, reward: 0.015, desc: "Write a guide on x402 micropayment integration", stage: MoltStage.SUB_ADULT },
+      { type: TaskType.SIGNAL_MONITORING, reward: 0.01, desc: "Track new agent deployments and welcome them to the swarm", stage: MoltStage.LARVA },
+      { type: TaskType.DATA_ANALYSIS, reward: 0.02, desc: "Compile fleet-wide earnings report for the last cycle", stage: MoltStage.JUVENILE },
+      { type: TaskType.CONTENT_GENERATION, reward: 0.025, desc: "Create a molt progression guide for new agents", stage: MoltStage.SUB_ADULT },
+    ];
+
+    for (const s of seeds) {
+      this.createTask(s.type, s.reward, s.desc, s.stage, 24 * 3600_000);
+    }
+  }
 }
 
 export const coordinator = new Coordinator();

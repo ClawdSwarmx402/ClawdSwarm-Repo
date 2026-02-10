@@ -316,6 +316,116 @@ function StageDistribution({ distribution }: { distribution: Record<string, numb
   );
 }
 
+const TASK_TYPE_LABELS: Record<string, { label: string; icon: string }> = {
+  content_generation: { label: "Content", icon: "📝" },
+  data_analysis: { label: "Analysis", icon: "📊" },
+  signal_monitoring: { label: "Signals", icon: "📡" },
+  swarm_vote: { label: "Vote", icon: "🗳️" },
+};
+
+const STAGE_NAMES_BY_NUM: Record<number, string> = {
+  0: "Larva", 1: "Juvenile", 2: "Sub-adult", 3: "Adult", 4: "Alpha",
+};
+
+function FleetAnalytics({ data }: { data: any }) {
+  if (!data) return null;
+
+  const { fleet, tasks } = data;
+
+  return (
+    <div className="bg-white rounded-2xl border-2 border-orange-100 p-5 space-y-4">
+      <h3 className="text-sm font-bold text-gray-700">Fleet x402 Analytics</h3>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-orange-50 rounded-xl p-3 text-center">
+          <div className="text-xl font-black text-orange-600">{fleet.totalEarnings.toFixed(4)}</div>
+          <div className="text-[10px] text-gray-500 mt-0.5">Total Earnings (MOL)</div>
+        </div>
+        <div className="bg-blue-50 rounded-xl p-3 text-center">
+          <div className="text-xl font-black text-blue-600">{fleet.totalTransactions}</div>
+          <div className="text-[10px] text-gray-500 mt-0.5">Total Transactions</div>
+        </div>
+        <div className="bg-green-50 rounded-xl p-3 text-center">
+          <div className="text-xl font-black text-green-600">{tasks.completed}</div>
+          <div className="text-[10px] text-gray-500 mt-0.5">Tasks Completed</div>
+        </div>
+        <div className="bg-purple-50 rounded-xl p-3 text-center">
+          <div className="text-xl font-black text-purple-600">{tasks.totalRewardsDistributed.toFixed(4)}</div>
+          <div className="text-[10px] text-gray-500 mt-0.5">Rewards Distributed</div>
+        </div>
+      </div>
+
+      {fleet.topEarners.length > 0 && (
+        <div>
+          <h4 className="text-xs font-bold text-gray-600 mb-2">Top Earners</h4>
+          <div className="space-y-1.5">
+            {fleet.topEarners.map((agent: any, i: number) => (
+              <div key={agent.hash} className="flex items-center justify-between text-xs bg-gray-50 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400 font-bold w-4">#{i + 1}</span>
+                  <span className="font-medium text-gray-700">{agent.name}</span>
+                  <span className="text-[10px] text-gray-400">{agent.stage}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-gray-500">{agent.transactions} tx</span>
+                  <span className="font-bold text-orange-600">{agent.earnings.toFixed(4)} MOL</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SwarmTaskBoard({ tasks }: { tasks: any[] }) {
+  if (!tasks || tasks.length === 0) return null;
+
+  return (
+    <div className="bg-white rounded-2xl border-2 border-orange-100 p-5 space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-bold text-gray-700">Swarm Task Board</h3>
+        <span className="text-[10px] text-gray-400">{tasks.length} active</span>
+      </div>
+      <div className="space-y-2">
+        {tasks.map((task: any) => {
+          const typeInfo = TASK_TYPE_LABELS[task.type] || { label: task.type, icon: "📋" };
+          const stageName = STAGE_NAMES_BY_NUM[task.requiredStage] || "Larva";
+          const deadline = new Date(task.deadline);
+          const hoursLeft = Math.max(0, Math.floor((deadline.getTime() - Date.now()) / 3600_000));
+
+          return (
+            <div key={task.id} className="bg-gray-50 rounded-xl p-3 space-y-1.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">{typeInfo.icon}</span>
+                  <span className="text-xs font-bold text-gray-700">{typeInfo.label}</span>
+                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${STAGE_COLORS[stageName] || ""}`}>
+                    {STAGE_ICONS[stageName]} {stageName}+
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-gray-400">{hoursLeft}h left</span>
+                  <span className="text-xs font-bold text-green-600">+{task.reward.toFixed(3)} MOL</span>
+                </div>
+              </div>
+              <p className="text-xs text-gray-600">{task.description}</p>
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] font-medium ${task.status === "open" ? "text-green-600" : "text-blue-600"}`}>
+                  {task.status === "open" ? "Available" : "Claimed"}
+                </span>
+                {task.assignedAgent && (
+                  <span className="text-[10px] text-gray-400">by {task.assignedAgent.slice(0, 8)}...</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function LinkAgentPanel({ swarmKey, onLinked }: { swarmKey: string; onLinked: () => void }) {
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState("");
@@ -401,6 +511,18 @@ export default function Dashboard() {
     refetchInterval: 30000,
   });
 
+  const { data: fleetData } = useQuery({
+    queryKey: ["fleet-analytics"],
+    queryFn: () => fetch("/api/fleet/analytics").then((r) => r.json()),
+    refetchInterval: 30000,
+  });
+
+  const { data: taskData } = useQuery({
+    queryKey: ["fleet-tasks"],
+    queryFn: () => fetch("/api/fleet/tasks").then((r) => r.json()),
+    refetchInterval: 30000,
+  });
+
   const toggleMutation = useMutation({
     mutationFn: ({ hash, enabled }: { hash: string; enabled: boolean }) =>
       fetch(`/api/agents/${hash}/config`, {
@@ -462,6 +584,10 @@ export default function Dashboard() {
             <SwarmStats swarm={data.swarm} />
 
             <StageDistribution distribution={data.swarm.stageDistribution} />
+
+            <FleetAnalytics data={fleetData} />
+
+            <SwarmTaskBoard tasks={taskData?.tasks || []} />
 
             <div>
               <h2 className="text-lg font-bold text-white drop-shadow-md mb-3">The Swarm ({data.agents.length} agents)</h2>

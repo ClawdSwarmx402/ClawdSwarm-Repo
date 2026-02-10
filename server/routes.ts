@@ -4,8 +4,9 @@ import { storage } from "./storage";
 import { initStore, findByDeploymentHash, findByLinkCode, upsertByDeploymentHash, updateAgent, listAgents, generateLinkCode } from "./agentStore";
 import { moltbookRegister, moltbookPost } from "./moltbookClient";
 import { createX402Router } from "./x402Routes";
-import { initLedger, getNetMoltBalance, getTransactionCount, getPaymentHistory } from "./paymentLedger";
+import { initLedger, getNetMoltBalance, getTransactionCount, getPaymentHistory, getAllAgentEarnings, getTotalEarnings } from "./paymentLedger";
 import { moltEngine } from "./moltEngine";
+import { coordinator } from "./swarmCoordinator";
 import crypto from "crypto";
 
 const CRAB_ADJECTIVES = ['Pinchy', 'Sideways', 'ShellShock', 'Clawdius', 'RaveCrab', 'MoltMaster', 'Crustacean', 'Scuttle', 'BubbleBlow', 'TidePool', 'Clawster', 'Shellby', 'Pinchington', 'Crabtastic', 'Moltacious'];
@@ -33,6 +34,7 @@ export async function registerRoutes(
 
   await initStore();
   initLedger();
+  coordinator.seedTasksIfEmpty();
 
   // mount x402 payment protocol routes
   app.use(createX402Router());
@@ -427,6 +429,71 @@ export async function registerRoutes(
 
       const updated = await updateAgent(hash, patch);
       return res.json({ ok: true, agent: updated });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/fleet/analytics", async (_req, res) => {
+    try {
+      const allAgents = await listAgents();
+      const earningsMap = getAllAgentEarnings();
+
+      let totalEarnings = 0;
+      let totalTransactions = 0;
+      const agentEarnings: { name: string; hash: string; earnings: number; transactions: number; stage: string }[] = [];
+
+      for (const agent of allAgents) {
+        const earnings = earningsMap.get(agent.deploymentHash) || 0;
+        const txCount = getTransactionCount(agent.deploymentHash);
+        const molt = moltEngine.getMoltProgress(agent.deploymentHash);
+        totalEarnings += earnings;
+        totalTransactions += txCount;
+        agentEarnings.push({
+          name: agent.name,
+          hash: agent.deploymentHash,
+          earnings,
+          transactions: txCount,
+          stage: molt.stageName,
+        });
+      }
+
+      agentEarnings.sort((a, b) => b.earnings - a.earnings);
+
+      const taskStats = coordinator.getStats();
+
+      return res.json({
+        fleet: {
+          totalAgents: allAgents.length,
+          totalEarnings: Number(totalEarnings.toFixed(6)),
+          totalTransactions,
+          topEarners: agentEarnings.slice(0, 5),
+        },
+        tasks: taskStats,
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/fleet/tasks", async (_req, res) => {
+    try {
+      const tasks = coordinator.getAllTasks()
+        .filter(t => t.status === "open" || t.status === "claimed")
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .slice(0, 20)
+        .map(t => ({
+          id: t.id,
+          type: t.type,
+          description: t.description,
+          reward: t.reward,
+          status: t.status,
+          requiredStage: t.requiredStage,
+          assignedAgent: t.assignedAgent,
+          deadline: t.deadline,
+        }));
+
+      return res.json({ tasks });
     } catch (e: any) {
       return res.status(500).json({ error: e.message });
     }
