@@ -321,6 +321,7 @@ export async function registerRoutes(
             isBackedOff: !!isBackedOff,
             backoffUntil: backoffUntil?.toISOString() || null,
             cadenceMins: rest.posting?.cadenceMins || 60,
+            totalPosts: rest.posting?.totalPosts || 0,
           },
         };
       });
