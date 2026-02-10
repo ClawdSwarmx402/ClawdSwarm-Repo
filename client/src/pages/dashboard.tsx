@@ -198,7 +198,7 @@ function AgentCard({ agent, onToggle, onUpdateConfig }: { agent: any; onToggle: 
         </div>
 
         {showConfig && (
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 space-y-2">
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 space-y-2 animate-in slide-in-from-top-2 duration-200">
             <div>
               <label className="text-xs font-medium text-gray-600">Mission</label>
               <input
@@ -230,7 +230,7 @@ function AgentCard({ agent, onToggle, onUpdateConfig }: { agent: any; onToggle: 
         )}
 
         {showLedger && (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1.5 max-h-48 overflow-y-auto">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1.5 animate-in slide-in-from-top-2 duration-200 max-h-48 overflow-y-auto">
             <div className="text-xs font-bold text-gray-600 mb-1">x402 Transaction Ledger</div>
             {agent.wallet.recentTransactions.length === 0 ? (
               <div className="text-xs text-gray-400 text-center py-2">No transactions yet</div>
@@ -308,10 +308,22 @@ function StageDistribution({ distribution }: { distribution: Record<string, numb
 export default function Dashboard() {
   const queryClient = useQueryClient();
 
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["dashboard"],
-    queryFn: () => fetch("/api/dashboard").then((r) => r.json()),
+    queryFn: async () => {
+      const res = await fetch("/api/dashboard");
+      if (!res.ok) throw new Error("Failed to fetch dashboard");
+      setLastRefresh(new Date());
+      return res.json();
+    },
     refetchInterval: 30000,
+  });
+
+  const sortedAgents = (data?.agents || []).slice().sort((a: any, b: any) => {
+    const priority: Record<string, number> = { active: 0, claimed: 1, claim_ready: 2, paused: 3 };
+    return (priority[a.status] ?? 4) - (priority[b.status] ?? 4);
   });
 
   const toggleMutation = useMutation({
@@ -341,6 +353,7 @@ export default function Dashboard() {
           <div>
             <h1 className="text-2xl font-black text-white drop-shadow-md">Swarm Dashboard</h1>
             <p className="text-sm text-orange-100">Monitor and manage your ClawdBots</p>
+            <p className="text-xs text-orange-200 mt-1">Last updated: {lastRefresh.toLocaleTimeString()}</p>
           </div>
           <div className="flex gap-2">
             <Link href="/app">
@@ -358,7 +371,7 @@ export default function Dashboard() {
 
         {isLoading && (
           <div className="bg-white rounded-2xl p-12 text-center">
-            <div className="text-4xl mb-3">🦀</div>
+            <div className="text-4xl animate-spin-slow mb-3">🦀</div>
             <div className="text-gray-500">Loading swarm data...</div>
           </div>
         )}
@@ -376,9 +389,9 @@ export default function Dashboard() {
             <StageDistribution distribution={data.swarm.stageDistribution} />
 
             <div>
-              <h2 className="text-lg font-bold text-white drop-shadow-md mb-3">Your Agents ({data.agents.length})</h2>
+              <h2 className="text-lg font-bold text-white drop-shadow-md mb-3">Your Agents ({sortedAgents.length})</h2>
               <div className="grid gap-4 md:grid-cols-2">
-                {data.agents.map((agent: any) => (
+                {sortedAgents.map((agent: any) => (
                   <AgentCard
                     key={agent.deploymentHash}
                     agent={agent}
