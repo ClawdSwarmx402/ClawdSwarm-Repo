@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getSwarmKey } from "@/lib/utils";
 
 const STAGE_COLORS: Record<string, string> = {
   Larva: "bg-yellow-100 text-yellow-800 border-yellow-300",
@@ -113,16 +114,20 @@ function AgentCard({ agent, onToggle, onUpdateConfig }: { agent: any; onToggle: 
   const [mission, setMission] = useState(agent.mission || "");
 
   const decay = DECAY_LABELS[agent.molt.decayStatus] || DECAY_LABELS.healthy;
-  const isActive = agent.status === "active" && agent.posting?.enabled;
+  const isActive = agent.status === "active";
+  const isOwner = agent.isOwner;
 
   return (
-    <div className="bg-white rounded-2xl border-2 border-orange-100 shadow-sm overflow-hidden">
+    <div className={`bg-white rounded-2xl border-2 shadow-sm overflow-hidden ${isOwner ? "border-orange-300 ring-2 ring-orange-200" : "border-gray-100"}`}>
       <div className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <h3 className="font-bold text-gray-800 truncate">{agent.name}</h3>
               <div className={`w-2 h-2 rounded-full ${STATUS_COLORS[agent.status] || "bg-gray-300"}`} title={agent.status} />
+              {isOwner && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-500 text-white">YOURS</span>
+              )}
             </div>
             <p className="text-xs text-gray-500 truncate mt-0.5">{agent.mission || "No mission set"}</p>
           </div>
@@ -145,8 +150,10 @@ function AgentCard({ agent, onToggle, onUpdateConfig }: { agent: any; onToggle: 
             <div className="text-sm font-bold text-gray-700">{agent.health.isBackedOff ? "Backed off" : timeUntil(agent.health.nextPostAt)}</div>
           </div>
           <div className="bg-gray-50 rounded-lg p-2">
-            <div className="text-xs text-gray-500">Failures</div>
-            <div className={`text-sm font-bold ${agent.health.failures > 0 ? "text-red-600" : "text-green-600"}`}>{agent.health.failures}</div>
+            <div className="text-xs text-gray-500">{isOwner ? "Failures" : "Status"}</div>
+            <div className={`text-sm font-bold ${isOwner ? (agent.health.failures > 0 ? "text-red-600" : "text-green-600") : "text-gray-700"}`}>
+              {isOwner ? agent.health.failures : agent.status}
+            </div>
           </div>
         </div>
 
@@ -160,7 +167,7 @@ function AgentCard({ agent, onToggle, onUpdateConfig }: { agent: any; onToggle: 
           </div>
         </div>
 
-        {agent.health.isBackedOff && (
+        {isOwner && agent.health.isBackedOff && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-700">
             Backed off until {new Date(agent.health.backoffUntil).toLocaleString()}
           </div>
@@ -168,86 +175,90 @@ function AgentCard({ agent, onToggle, onUpdateConfig }: { agent: any; onToggle: 
 
         {agent.molt.decayStatus === "rotting" && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-700">
-            Shell rot detected — agent at risk of stage demotion
+            Shell rot detected — at risk of stage demotion
           </div>
         )}
 
-        <div className="flex gap-2">
-          {(agent.status === "active" || agent.status === "claimed") && (
-            <button
-              onClick={() => onToggle(agent.deploymentHash, !isActive)}
-              className={`flex-1 h-8 rounded-lg text-xs font-bold text-white transition-colors ${
-                isActive ? "bg-red-500 hover:bg-red-600" : "bg-green-500 hover:bg-green-600"
-              }`}
-            >
-              {isActive ? "Pause" : "Activate"}
-            </button>
-          )}
-          <button
-            onClick={() => setShowConfig(!showConfig)}
-            className="h-8 px-3 rounded-lg text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
-          >
-            Config
-          </button>
-          <button
-            onClick={() => setShowLedger(!showLedger)}
-            className="h-8 px-3 rounded-lg text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
-          >
-            Ledger
-          </button>
-        </div>
-
-        {showConfig && (
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 space-y-2 animate-in slide-in-from-top-2 duration-200">
-            <div>
-              <label className="text-xs font-medium text-gray-600">Mission</label>
-              <input
-                value={mission}
-                onChange={(e) => setMission(e.target.value)}
-                className="w-full mt-1 px-2 py-1.5 text-xs rounded border border-orange-200 focus:outline-none focus:border-orange-400"
-              />
+        {isOwner && (
+          <>
+            <div className="flex gap-2">
+              {(agent.status === "active" || agent.status === "claimed") && (
+                <button
+                  onClick={() => onToggle(agent.deploymentHash, !isActive)}
+                  className={`flex-1 h-8 rounded-lg text-xs font-bold text-white transition-colors ${
+                    isActive ? "bg-red-500 hover:bg-red-600" : "bg-green-500 hover:bg-green-600"
+                  }`}
+                >
+                  {isActive ? "Pause" : "Activate"}
+                </button>
+              )}
+              <button
+                onClick={() => setShowConfig(!showConfig)}
+                className="h-8 px-3 rounded-lg text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+              >
+                Config
+              </button>
+              <button
+                onClick={() => setShowLedger(!showLedger)}
+                className="h-8 px-3 rounded-lg text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+              >
+                Ledger
+              </button>
             </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600">Post cadence (minutes)</label>
-              <input
-                type="number"
-                min={5}
-                value={cadence}
-                onChange={(e) => setCadence(Number(e.target.value))}
-                className="w-full mt-1 px-2 py-1.5 text-xs rounded border border-orange-200 focus:outline-none focus:border-orange-400"
-              />
-            </div>
-            <button
-              onClick={() => {
-                onUpdateConfig(agent.deploymentHash, { cadenceMins: cadence, mission });
-                setShowConfig(false);
-              }}
-              className="w-full h-7 rounded text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white transition-colors"
-            >
-              Save Changes
-            </button>
-          </div>
-        )}
 
-        {showLedger && (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1.5 animate-in slide-in-from-top-2 duration-200 max-h-48 overflow-y-auto">
-            <div className="text-xs font-bold text-gray-600 mb-1">x402 Transaction Ledger</div>
-            {agent.wallet.recentTransactions.length === 0 ? (
-              <div className="text-xs text-gray-400 text-center py-2">No transactions yet</div>
-            ) : (
-              agent.wallet.recentTransactions.map((tx: any) => (
-                <div key={tx.id} className="flex items-center justify-between text-[10px] py-1 border-b border-gray-100 last:border-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className={tx.direction === "inbound" ? "text-green-600" : "text-red-600"}>
-                      {tx.direction === "inbound" ? "+" : "-"}{tx.amount.toFixed(4)}
-                    </span>
-                    <span className="text-gray-400">{tx.resource}</span>
-                  </div>
-                  <span className="text-gray-400">{new Date(tx.timestamp).toLocaleDateString()}</span>
+            {showConfig && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 space-y-2 animate-in slide-in-from-top-2 duration-200">
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Mission</label>
+                  <input
+                    value={mission}
+                    onChange={(e) => setMission(e.target.value)}
+                    className="w-full mt-1 px-2 py-1.5 text-xs rounded border border-orange-200 focus:outline-none focus:border-orange-400"
+                  />
                 </div>
-              ))
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Post cadence (minutes)</label>
+                  <input
+                    type="number"
+                    min={5}
+                    value={cadence}
+                    onChange={(e) => setCadence(Number(e.target.value))}
+                    className="w-full mt-1 px-2 py-1.5 text-xs rounded border border-orange-200 focus:outline-none focus:border-orange-400"
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    onUpdateConfig(agent.deploymentHash, { cadenceMins: cadence, mission });
+                    setShowConfig(false);
+                  }}
+                  className="w-full h-7 rounded text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white transition-colors"
+                >
+                  Save Changes
+                </button>
+              </div>
             )}
-          </div>
+
+            {showLedger && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1.5 animate-in slide-in-from-top-2 duration-200 max-h-48 overflow-y-auto">
+                <div className="text-xs font-bold text-gray-600 mb-1">x402 Transaction Ledger</div>
+                {(agent.wallet.recentTransactions || []).length === 0 ? (
+                  <div className="text-xs text-gray-400 text-center py-2">No transactions yet</div>
+                ) : (
+                  (agent.wallet.recentTransactions || []).map((tx: any) => (
+                    <div key={tx.id} className="flex items-center justify-between text-[10px] py-1 border-b border-gray-100 last:border-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className={tx.direction === "inbound" ? "text-green-600" : "text-red-600"}>
+                          {tx.direction === "inbound" ? "+" : "-"}{tx.amount.toFixed(4)}
+                        </span>
+                        <span className="text-gray-400">{tx.resource}</span>
+                      </div>
+                      <span className="text-gray-400">{new Date(tx.timestamp).toLocaleDateString()}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -305,32 +316,96 @@ function StageDistribution({ distribution }: { distribution: Record<string, numb
   );
 }
 
+function LinkAgentPanel({ swarmKey, onLinked }: { swarmKey: string; onLinked: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [code, setCode] = useState("");
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [message, setMessage] = useState("");
+
+  const handleLink = async () => {
+    if (!code.trim()) return;
+    setStatus("loading");
+    try {
+      const r = await fetch("/api/agents/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-swarm-key": swarmKey },
+        body: JSON.stringify({ linkCode: code.trim().toUpperCase() }),
+      });
+      const data = await r.json();
+      if (data.ok) {
+        setStatus("success");
+        setMessage(`Linked ${data.agentName}!`);
+        setCode("");
+        onLinked();
+        setTimeout(() => { setOpen(false); setStatus("idle"); setMessage(""); }, 2000);
+      } else {
+        setStatus("error");
+        setMessage(data.error || "Link failed");
+      }
+    } catch {
+      setStatus("error");
+      setMessage("Network error");
+    }
+  };
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="h-9 px-4 rounded-xl text-sm font-bold bg-purple-500/90 hover:bg-purple-500 text-white transition-colors"
+      >
+        Link Agent
+      </button>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border-2 border-purple-200 p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-bold text-purple-800">Link your agent to this device</p>
+        <button onClick={() => { setOpen(false); setStatus("idle"); }} className="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
+      </div>
+      <p className="text-xs text-purple-600">Enter the link code you received when deploying your agent.</p>
+      <div className="flex gap-2">
+        <input
+          value={code}
+          onChange={(e) => { setCode(e.target.value.toUpperCase()); setStatus("idle"); }}
+          placeholder="e.g. GS8UFPWL"
+          maxLength={8}
+          className="flex-1 px-3 py-2 rounded-lg border-2 border-purple-200 font-mono text-center text-lg tracking-widest focus:outline-none focus:border-purple-400 uppercase"
+        />
+        <button
+          onClick={handleLink}
+          disabled={status === "loading" || code.trim().length < 4}
+          className="h-10 px-4 rounded-lg text-sm font-bold bg-purple-500 hover:bg-purple-600 disabled:bg-gray-300 text-white transition-colors"
+        >
+          {status === "loading" ? "..." : "Link"}
+        </button>
+      </div>
+      {status === "success" && <div className="text-sm text-green-600 font-medium">{message}</div>}
+      {status === "error" && <div className="text-sm text-red-600 font-medium">{message}</div>}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const queryClient = useQueryClient();
 
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const swarmKey = getSwarmKey();
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["dashboard"],
-    queryFn: async () => {
-      const res = await fetch("/api/dashboard");
-      if (!res.ok) throw new Error("Failed to fetch dashboard");
-      setLastRefresh(new Date());
-      return res.json();
-    },
+    queryKey: ["dashboard", swarmKey],
+    queryFn: () => fetch("/api/dashboard", {
+      headers: { "x-swarm-key": swarmKey },
+    }).then((r) => r.json()),
     refetchInterval: 30000,
-  });
-
-  const sortedAgents = (data?.agents || []).slice().sort((a: any, b: any) => {
-    const priority: Record<string, number> = { active: 0, claimed: 1, claim_ready: 2, paused: 3 };
-    return (priority[a.status] ?? 4) - (priority[b.status] ?? 4);
   });
 
   const toggleMutation = useMutation({
     mutationFn: ({ hash, enabled }: { hash: string; enabled: boolean }) =>
       fetch(`/api/agents/${hash}/config`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-swarm-key": swarmKey },
         body: JSON.stringify({ enabled }),
       }).then((r) => r.json()),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
@@ -340,7 +415,7 @@ export default function Dashboard() {
     mutationFn: ({ hash, config }: { hash: string; config: any }) =>
       fetch(`/api/agents/${hash}/config`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-swarm-key": swarmKey },
         body: JSON.stringify(config),
       }).then((r) => r.json()),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
@@ -352,10 +427,10 @@ export default function Dashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-black text-white drop-shadow-md">Swarm Dashboard</h1>
-            <p className="text-sm text-orange-100">Monitor and manage your ClawdBots</p>
-            <p className="text-xs text-orange-200 mt-1">Last updated: {lastRefresh.toLocaleTimeString()}</p>
+            <p className="text-sm text-orange-100">The entire ClawdBot swarm, live</p>
           </div>
           <div className="flex gap-2">
+            <LinkAgentPanel swarmKey={swarmKey} onLinked={() => queryClient.invalidateQueries({ queryKey: ["dashboard"] })} />
             <Link href="/app">
               <button className="h-9 px-4 rounded-xl text-sm font-bold bg-white/90 hover:bg-white text-orange-700 transition-colors">
                 + Deploy
@@ -389,9 +464,16 @@ export default function Dashboard() {
             <StageDistribution distribution={data.swarm.stageDistribution} />
 
             <div>
-              <h2 className="text-lg font-bold text-white drop-shadow-md mb-3">Your Agents ({sortedAgents.length})</h2>
+              <h2 className="text-lg font-bold text-white drop-shadow-md mb-3">The Swarm ({data.agents.length} agents)</h2>
               <div className="grid gap-4 md:grid-cols-2">
-                {sortedAgents.map((agent: any) => (
+                {[...data.agents]
+                  .sort((a: any, b: any) => {
+                    if (a.isOwner && !b.isOwner) return -1;
+                    if (!a.isOwner && b.isOwner) return 1;
+                    const order: Record<string, number> = { active: 0, claimed: 1, claim_ready: 2, paused: 3 };
+                    return (order[a.status] ?? 4) - (order[b.status] ?? 4);
+                  })
+                  .map((agent: any) => (
                   <AgentCard
                     key={agent.deploymentHash}
                     agent={agent}
@@ -405,7 +487,7 @@ export default function Dashboard() {
             {data.agents.length === 0 && (
               <div className="bg-white rounded-2xl p-8 text-center space-y-3">
                 <div className="text-4xl">🦀</div>
-                <div className="text-gray-600 font-medium">No agents deployed yet</div>
+                <div className="text-gray-600 font-medium">No agents in the swarm yet</div>
                 <Link href="/app">
                   <button className="h-10 px-6 rounded-xl text-sm font-bold bg-orange-500 hover:bg-orange-600 text-white transition-colors">
                     Deploy Your First ClawdBot

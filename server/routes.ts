@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { initStore, findByDeploymentHash, upsertByDeploymentHash, updateAgent, listAgents } from "./agentStore";
+import { initStore, findByDeploymentHash, findByLinkCode, upsertByDeploymentHash, updateAgent, listAgents, generateLinkCode } from "./agentStore";
 import { moltbookRegister, moltbookPost } from "./moltbookClient";
 import { createX402Router } from "./x402Routes";
 import { initLedger, getNetMoltBalance, getTransactionCount, getPaymentHistory } from "./paymentLedger";
@@ -39,7 +39,7 @@ export async function registerRoutes(
 
   app.post("/api/agents/deploy", async (req, res) => {
     try {
-      const { name, persona = "", mission = "", avatar_url = "", userKey = "" } = req.body;
+      const { name, persona = "", mission = "", avatar_url = "", userKey = "", swarmKey = "" } = req.body;
       if (!name || (!persona && !mission)) {
         return res.status(400).json({ error: "name + persona/mission required" });
       }
@@ -48,6 +48,12 @@ export async function registerRoutes(
 
       const existing = await findByDeploymentHash(deploymentHash);
       if (existing?.status === "claim_ready" || existing?.status === "claimed" || existing?.status === "active") {
+        if (existing.swarmKey && existing.swarmKey !== swarmKey) {
+          return res.status(403).json({ error: "Agent belongs to another user" });
+        }
+        if (swarmKey && !existing.swarmKey) {
+          await updateAgent(deploymentHash, { swarmKey });
+        }
         return res.json({
           deploymentHash,
           status: existing.status,
@@ -55,17 +61,22 @@ export async function registerRoutes(
           verificationCode: existing.verificationCode,
           dashboardAccessCode: existing.dashboardAccessCode,
           agentName: existing.name,
+          linkCode: existing.linkCode,
         });
       }
 
       const description = [persona && `Persona: ${persona}`, mission && `Mission: ${mission}`].filter(Boolean).join("\n");
       const mb = await moltbookRegister({ name, description, avatar_url });
 
+      const linkCode = generateLinkCode();
+
       await upsertByDeploymentHash(deploymentHash, {
         name,
         persona,
         mission,
         status: "claim_ready",
+        swarmKey: swarmKey || undefined,
+        linkCode,
         moltbookAgentId: mb.agent?.id,
         moltbookApiKey: mb.api_key,
         claimUrl: mb.claim_url,
@@ -81,6 +92,32 @@ export async function registerRoutes(
         verificationCode: mb.verification_code,
         dashboardAccessCode: mb.dashboard_access_code,
         agentName: mb.agent?.name ?? name,
+        linkCode,
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/agents/link", async (req, res) => {
+    try {
+      const { linkCode } = req.body;
+      const swarmKey = (req.headers["x-swarm-key"] as string) || "";
+      if (!linkCode || !swarmKey) {
+        return res.status(400).json({ error: "linkCode and x-swarm-key required" });
+      }
+
+      const agent = await findByLinkCode(linkCode.toUpperCase().trim());
+      if (!agent) {
+        return res.status(404).json({ error: "No agent found with that link code" });
+      }
+
+      await updateAgent(agent.deploymentHash, { swarmKey });
+
+      return res.json({
+        ok: true,
+        agentName: agent.name,
+        status: agent.status,
       });
     } catch (e: any) {
       return res.status(500).json({ error: e.message });
@@ -90,9 +127,12 @@ export async function registerRoutes(
   app.post("/api/agents/:deploymentHash/claimed", async (req, res) => {
     try {
       const { deploymentHash } = req.params;
+      const swarmKey = (req.headers["x-swarm-key"] as string) || "";
+      const agent = await findByDeploymentHash(deploymentHash);
+      if (!agent) return res.status(404).json({ error: "not found" });
+      if (!swarmKey || agent.swarmKey !== swarmKey) return res.status(403).json({ error: "Unauthorized" });
       const updated = await updateAgent(deploymentHash, { status: "claimed" });
-      if (!updated) return res.status(404).json({ error: "not found" });
-      return res.json({ ok: true, status: updated.status });
+      return res.json({ ok: true, status: updated?.status });
     } catch (e: any) {
       return res.status(500).json({ error: e.message });
     }
@@ -101,6 +141,10 @@ export async function registerRoutes(
   app.post("/api/agents/:deploymentHash/posting", async (req, res) => {
     try {
       const { deploymentHash } = req.params;
+      const swarmKey = (req.headers["x-swarm-key"] as string) || "";
+      const agent = await findByDeploymentHash(deploymentHash);
+      if (!agent) return res.status(404).json({ error: "not found" });
+      if (!swarmKey || agent.swarmKey !== swarmKey) return res.status(403).json({ error: "Unauthorized" });
       const { enabled, cadenceMins } = req.body;
       const updated = await updateAgent(deploymentHash, {
         status: enabled ? "active" : "paused",
@@ -110,17 +154,18 @@ export async function registerRoutes(
           failures: 0,
         },
       });
-      if (!updated) return res.status(404).json({ error: "not found" });
-      return res.json({ ok: true, status: updated.status, posting: updated.posting });
+      return res.json({ ok: true, status: updated?.status, posting: updated?.posting });
     } catch (e: any) {
       return res.status(500).json({ error: e.message });
     }
   });
 
-  app.get("/api/agents", async (_req, res) => {
+  app.get("/api/agents", async (req, res) => {
     try {
-      const agents = await listAgents();
-      const safeAgents = agents.map(({ moltbookApiKey, ...rest }) => rest);
+      const swarmKey = (req.headers["x-swarm-key"] as string) || "";
+      const allAgents = await listAgents();
+      const filtered = swarmKey ? allAgents.filter(a => a.swarmKey === swarmKey) : [];
+      const safeAgents = filtered.map(({ moltbookApiKey, claimUrl, verificationCode, dashboardAccessCode, moltbookAgentId, linkCode: _lc, swarmKey: _sk, ...rest }) => rest);
       return res.json(safeAgents);
     } catch (e: any) {
       return res.status(500).json({ error: e.message });
@@ -129,11 +174,11 @@ export async function registerRoutes(
 
   app.get("/api/agents/:deploymentHash/check-claim", async (req, res) => {
     try {
+      const swarmKey = (req.headers["x-swarm-key"] as string) || "";
       const agent = await findByDeploymentHash(req.params.deploymentHash);
-
-      if (!agent || !agent.moltbookApiKey) {
-        return res.status(400).json({ ok: false, error: "Agent not ready" });
-      }
+      if (!agent) return res.status(404).json({ ok: false, error: "Agent not found" });
+      if (!swarmKey || agent.swarmKey !== swarmKey) return res.status(403).json({ error: "Unauthorized" });
+      if (!agent.moltbookApiKey) return res.status(400).json({ ok: false, error: "Agent not ready" });
 
       const moltApi = `${process.env.MOLTBOOK_BASE || "https://www.moltbook.com"}/api/v1`;
       const r = await fetch(`${moltApi}/agents/status`, {
@@ -148,18 +193,17 @@ export async function registerRoutes(
 
       res.json({ ok: true, status: r.status });
     } catch (e: any) {
-      console.error("check-claim error:", e);
       return res.status(500).json({ ok: false, error: e.message });
     }
   });
 
   app.post("/api/agents/:deploymentHash/post-first", async (req, res) => {
     try {
+      const swarmKey = (req.headers["x-swarm-key"] as string) || "";
       const agent = await findByDeploymentHash(req.params.deploymentHash);
-
-      if (!agent?.moltbookApiKey) {
-        return res.status(400).json({ ok: false, error: "Missing API key" });
-      }
+      if (!agent) return res.status(404).json({ ok: false, error: "Agent not found" });
+      if (!swarmKey || agent.swarmKey !== swarmKey) return res.status(403).json({ error: "Unauthorized" });
+      if (!agent.moltbookApiKey) return res.status(400).json({ ok: false, error: "Missing API key" });
 
       // Safety: ensure claimed
       const moltApi = `${process.env.MOLTBOOK_BASE || "https://www.moltbook.com"}/api/v1`;
@@ -198,18 +242,17 @@ export async function registerRoutes(
 
       res.json({ ok: true, post });
     } catch (e: any) {
-      console.error("post-first error:", e);
       return res.status(500).json({ ok: false, error: e.message });
     }
   });
 
   app.post("/api/agents/:deploymentHash/activate", async (req, res) => {
     try {
+      const swarmKey = (req.headers["x-swarm-key"] as string) || "";
       const agent = await findByDeploymentHash(req.params.deploymentHash);
-
-      if (!agent?.moltbookApiKey) {
-        return res.status(400).json({ ok: false, error: "Missing API key" });
-      }
+      if (!agent) return res.status(404).json({ ok: false, error: "Agent not found" });
+      if (!swarmKey || agent.swarmKey !== swarmKey) return res.status(403).json({ error: "Unauthorized" });
+      if (!agent.moltbookApiKey) return res.status(400).json({ ok: false, error: "Missing API key" });
 
       // Check claim status first
       const moltApi = `${process.env.MOLTBOOK_BASE || "https://www.moltbook.com"}/api/v1`;
@@ -248,7 +291,6 @@ export async function registerRoutes(
 
       res.json({ ok: true, post });
     } catch (e: any) {
-      console.error("activate error:", e);
       return res.status(500).json({ ok: false, error: e.message });
     }
   });
@@ -256,11 +298,16 @@ export async function registerRoutes(
   app.post("/api/agents/:hash/attach-key", async (req, res) => {
     try {
       const { hash } = req.params;
+      const swarmKey = (req.headers["x-swarm-key"] as string) || "";
       const { apiKey } = req.body || {};
 
       if (!apiKey || typeof apiKey !== "string") {
         return res.status(400).json({ error: "apiKey required" });
       }
+
+      const agent = await findByDeploymentHash(hash);
+      if (!agent) return res.status(404).json({ error: "Agent not found" });
+      if (!swarmKey || agent.swarmKey !== swarmKey) return res.status(403).json({ error: "Unauthorized" });
 
       const updated = await updateAgent(hash, {
         moltbookApiKey: apiKey,
@@ -268,27 +315,24 @@ export async function registerRoutes(
         posting: { enabled: true, cadenceMins: 60, failures: 0 },
       });
 
-      if (!updated) {
-        return res.status(404).json({ error: "Agent not found" });
-      }
-
-      return res.json({ ok: true, status: updated.status });
+      return res.json({ ok: true, status: updated?.status });
     } catch (e: any) {
-      console.error("attach-key error:", e);
       return res.status(500).json({ error: e.message });
     }
   });
 
-  app.get("/api/dashboard", async (_req, res) => {
+  app.get("/api/dashboard", async (req, res) => {
     try {
-      const agents = await listAgents();
-      const safeAgents = agents.map(({ moltbookApiKey, ...rest }) => {
+      const swarmKey = (req.headers["x-swarm-key"] as string) || "";
+      const allAgents = await listAgents();
+
+      const safeAgents = allAgents.map(({ moltbookApiKey, claimUrl, verificationCode, dashboardAccessCode, moltbookAgentId, linkCode: _lc, swarmKey: agentKey, ...rest }) => {
+        const isOwner = !!(swarmKey && agentKey === swarmKey);
         const molt = moltEngine.getMoltProgress(rest.deploymentHash);
         const decay = moltEngine.checkDecay(rest.deploymentHash);
         const eligibility = moltEngine.checkMoltEligibility(rest.deploymentHash);
         const balance = getNetMoltBalance(rest.deploymentHash);
         const txCount = getTransactionCount(rest.deploymentHash);
-        const history = getPaymentHistory(rest.deploymentHash, 10);
 
         const lastPost = rest.posting?.lastPostAt ? new Date(rest.posting.lastPostAt) : null;
         const nextPost = lastPost
@@ -297,39 +341,47 @@ export async function registerRoutes(
         const backoffUntil = rest.posting?.backoffUntil ? new Date(rest.posting.backoffUntil) : null;
         const isBackedOff = backoffUntil && backoffUntil > new Date();
 
-        return {
-          ...rest,
+        const base: any = {
+          deploymentHash: rest.deploymentHash,
+          name: rest.name,
+          mission: rest.mission,
+          status: rest.status,
+          isOwner,
           molt: {
             stage: molt.currentStage,
             stageName: molt.stageName,
             decayStatus: decay,
             progress: molt.progress,
-            unlocks: molt.unlocks,
-            eligible: eligibility.eligible,
-            cooldownMs: eligibility.cooldownMs,
-            requirements: eligibility.requirements,
           },
           wallet: {
             balance,
             totalTransactions: txCount,
-            recentTransactions: history,
           },
           health: {
             lastPostAt: rest.posting?.lastPostAt || null,
             nextPostAt: isBackedOff ? backoffUntil!.toISOString() : nextPost?.toISOString() || null,
             failures: rest.posting?.failures || 0,
             isBackedOff: !!isBackedOff,
-            backoffUntil: backoffUntil?.toISOString() || null,
             cadenceMins: rest.posting?.cadenceMins || 60,
-            totalPosts: rest.posting?.totalPosts || 0,
           },
         };
+
+        if (isOwner) {
+          base.molt.unlocks = molt.unlocks;
+          base.molt.eligible = eligibility.eligible;
+          base.molt.cooldownMs = eligibility.cooldownMs;
+          base.molt.requirements = eligibility.requirements;
+          base.wallet.recentTransactions = getPaymentHistory(rest.deploymentHash, 10);
+          base.health.backoffUntil = backoffUntil?.toISOString() || null;
+        }
+
+        return base;
       });
 
-      const totalAgents = agents.length;
-      const activeAgents = agents.filter(a => a.status === "active").length;
-      const claimedAgents = agents.filter(a => a.status === "claimed").length;
-      const pendingAgents = agents.filter(a => a.status === "claim_ready").length;
+      const totalAgents = allAgents.length;
+      const activeAgents = allAgents.filter(a => a.status === "active").length;
+      const claimedAgents = allAgents.filter(a => a.status === "claimed").length;
+      const pendingAgents = allAgents.filter(a => a.status === "claim_ready").length;
 
       const stageDistribution: Record<string, number> = { Larva: 0, Juvenile: 0, "Sub-adult": 0, Adult: 0, Alpha: 0 };
       for (const a of safeAgents) {
@@ -354,9 +406,11 @@ export async function registerRoutes(
   app.patch("/api/agents/:hash/config", async (req, res) => {
     try {
       const { hash } = req.params;
+      const swarmKey = (req.headers["x-swarm-key"] as string) || "";
       const { cadenceMins, enabled, mission } = req.body;
       const agent = await findByDeploymentHash(hash);
       if (!agent) return res.status(404).json({ error: "Agent not found" });
+      if (!swarmKey || agent.swarmKey !== swarmKey) return res.status(403).json({ error: "Unauthorized" });
 
       const patch: Partial<typeof agent> = {};
       if (typeof mission === "string") patch.mission = mission;
@@ -380,32 +434,11 @@ export async function registerRoutes(
 
   app.get("/health", (_req, res) => res.json({ ok: true }));
 
-  app.get("/debug", async (_req, res) => {
-    res.json({
-      ok: true,
-      time: new Date().toISOString(),
-      moltBase: process.env.MOLTBOOK_BASE || null,
-      hasMongo: !!process.env.MONGO_URI,
-    });
-  });
-
-  app.get("/agents-ui", async (_req, res) => {
-    const agents = await listAgents();
-    res.setHeader("content-type", "text/html");
-    res.end(`
-      <html>
-        <body style="font-family: ui-sans-serif; padding: 16px;">
-          <h2>Agents</h2>
-          <pre>${escapeHtml(JSON.stringify(agents, null, 2))}</pre>
-        </body>
-      </html>
-    `);
-  });
-
   app.post("/deploy", async (req, res) => {
     try {
       const data = req.body || {};
       const mission = (data.mission || '').trim();
+      const swarmKey = (data.swarmKey || '').trim();
       
       if (!mission) {
         return res.status(400).json({ error: 'Mission required' });
@@ -419,6 +452,12 @@ export async function registerRoutes(
 
       const existing = await findByDeploymentHash(deploymentHash);
       if (existing?.status === "claim_ready" || existing?.status === "claimed" || existing?.status === "active") {
+        if (existing.swarmKey && existing.swarmKey !== swarmKey) {
+          return res.status(403).json({ success: false, error: "Agent belongs to another user" });
+        }
+        if (swarmKey && !existing.swarmKey) {
+          await updateAgent(deploymentHash, { swarmKey });
+        }
         const profileLink = `https://www.moltbook.com/u/${existing.name.toLowerCase()}`;
         const code = existing.verificationCode;
         if (!code) {
@@ -438,6 +477,7 @@ export async function registerRoutes(
           claim_url: existing.claimUrl,
           verification_code: existing.verificationCode,
           dashboard_access_code: existing.dashboardAccessCode,
+          link_code: existing.linkCode,
           tweet_text: tweetText,
           instructions: "Your crab already exists! Claim it with a quick tweet to activate posting 🦀"
         });
@@ -445,11 +485,15 @@ export async function registerRoutes(
 
       const mb = await moltbookRegister({ name: agentName, description });
 
+      const newLinkCode = generateLinkCode();
+
       await upsertByDeploymentHash(deploymentHash, {
         name: mb.agent?.name ?? agentName,
         persona,
         mission,
         status: 'claim_ready',
+        swarmKey: swarmKey || undefined,
+        linkCode: newLinkCode,
         moltbookAgentId: mb.agent?.id,
         moltbookApiKey: mb.api_key,
         claimUrl: mb.claim_url,
@@ -492,12 +536,12 @@ export async function registerRoutes(
         claim_url: mb.claim_url,
         verification_code: mb.verification_code,
         dashboard_access_code: mb.dashboard_access_code,
+        link_code: newLinkCode,
         agent_id: mb.agent?.id,
         tweet_text: tweetText,
         instructions: "Your crab just scuttled into existence! Claim it with a quick tweet to activate posting 🦀"
       });
     } catch (e: any) {
-      console.error("Deploy error:", e);
       return res.status(500).json({ error: e.message || 'Failed to deploy agent' });
     }
   });

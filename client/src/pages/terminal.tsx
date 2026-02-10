@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getSwarmKey } from "@/lib/utils";
 
 const TERMINAL_STORAGE_KEY = "clawdswarm_terminal_state";
 
@@ -39,6 +40,7 @@ export default function Terminal() {
   const [copied, setCopied] = useState(false);
   const [deployError, setDeployError] = useState(false);
   const [deploymentHash, setDeploymentHash] = useState(saved?.deploymentHash || "");
+  const [linkCode, setLinkCode] = useState(saved?.linkCode || "");
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [agentStatus, setAgentStatus] = useState<string>(saved?.agentStatus || "claim_ready");
   const [checkingClaim, setCheckingClaim] = useState(false);
@@ -49,7 +51,7 @@ export default function Terminal() {
     saveTerminalState({
       step, logs, agentName, fullPrompt, generatedAgentName,
       profileLink, claimUrl, verificationCode, tweetText,
-      deploymentHash, agentStatus
+      deploymentHash, linkCode, agentStatus
     });
   }, [step, logs, agentName, fullPrompt, generatedAgentName, profileLink, claimUrl, verificationCode, tweetText, deploymentHash, agentStatus]);
 
@@ -101,7 +103,7 @@ export default function Terminal() {
       const response = await fetch('/deploy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mission })
+        body: JSON.stringify({ mission, swarmKey: getSwarmKey() })
       });
 
       const data = await response.json();
@@ -119,6 +121,7 @@ export default function Terminal() {
         setTweetText(data.tweet_text || '');
         setFullPrompt(data.full_prompt || '');
         setDeploymentHash(data.deployment_hash || '');
+        setLinkCode(data.link_code || '');
         setStep("deployed");
       } else {
         addLog(`ERROR > ${data.error || 'Deployment failed'}`);
@@ -171,7 +174,7 @@ Remember: never share your Moltbook API key except to https://www.moltbook.com/a
     try {
       const response = await fetch(`/api/agents/${deploymentHash}/attach-key`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-swarm-key': getSwarmKey() },
         body: JSON.stringify({ apiKey: apiKeyInput.trim() })
       });
       
@@ -339,6 +342,24 @@ Remember: never share your Moltbook API key except to https://www.moltbook.com/a
                  </ol>
                </div>
 
+               {linkCode && (
+                 <div className="bg-purple-50 border-2 border-purple-200 rounded-2xl p-4 space-y-2">
+                   <p className="text-sm font-bold text-purple-800">Your Link Code (save this!):</p>
+                   <p className="text-xs text-purple-600">Use this code to access your agent from any device. Enter it on the Swarm Dashboard.</p>
+                   <div className="flex items-center justify-between gap-2">
+                     <code className="bg-white px-3 py-1.5 rounded-lg font-mono text-lg font-bold text-purple-700 border border-purple-200 tracking-widest">
+                       {linkCode}
+                     </code>
+                     <button
+                       onClick={() => navigator.clipboard.writeText(linkCode)}
+                       className="text-xs bg-white border border-purple-200 px-3 py-1 rounded-lg hover:bg-purple-100 transition-colors"
+                     >
+                       Copy
+                     </button>
+                   </div>
+                 </div>
+               )}
+
                <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl p-4 space-y-3">
                  <div className="flex items-center justify-between gap-2">
                    <a 
@@ -346,12 +367,14 @@ Remember: never share your Moltbook API key except to https://www.moltbook.com/a
                      target="_blank"
                      rel="noopener noreferrer"
                      className="text-orange-600 hover:text-orange-800 underline text-sm font-medium truncate flex-1"
+                    
                    >
                      Open Claim URL →
                    </a>
                    <button
                      onClick={() => navigator.clipboard.writeText(claimUrl)}
                      className="text-xs bg-white border border-orange-200 px-3 py-1 rounded-lg hover:bg-orange-100 transition-colors"
+                    
                    >
                      Copy
                    </button>
@@ -368,6 +391,7 @@ Remember: never share your Moltbook API key except to https://www.moltbook.com/a
                      onClick={() => navigator.clipboard.writeText(verificationCode)}
                      disabled={!verificationCode}
                      className="text-xs bg-white border border-orange-200 px-3 py-1 rounded-lg hover:bg-orange-100 transition-colors disabled:opacity-50"
+                    
                    >
                      Copy
                    </button>
@@ -379,6 +403,7 @@ Remember: never share your Moltbook API key except to https://www.moltbook.com/a
                  target="_blank"
                  rel="noopener noreferrer"
                  className="block w-full h-12 rounded-xl text-base font-bold bg-[#1DA1F2] hover:bg-[#1a8cd8] text-white shadow-lg flex items-center justify-center gap-2 transition-colors"
+                
                >
                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
                  Tweet to Claim
@@ -389,7 +414,7 @@ Remember: never share your Moltbook API key except to https://www.moltbook.com/a
                  onClick={async () => {
                    setCheckingClaim(true);
                    try {
-                     const r = await fetch(`/api/agents/${deploymentHash}/check-claim`);
+                     const r = await fetch(`/api/agents/${deploymentHash}/check-claim`, { headers: { 'x-swarm-key': getSwarmKey() } });
                      const j = await r.json();
                      if (!j.ok) {
                        addLog(`ERROR > ${j.error || "Claim check failed"}`);
@@ -413,7 +438,7 @@ Remember: never share your Moltbook API key except to https://www.moltbook.com/a
                  onClick={async () => {
                    setActivating(true);
                    try {
-                     const r = await fetch(`/api/agents/${deploymentHash}/activate`, { method: "POST" });
+                     const r = await fetch(`/api/agents/${deploymentHash}/activate`, { method: "POST", headers: { 'x-swarm-key': getSwarmKey() } });
                      const j = await r.json();
                      if (!j.ok) {
                        addLog(`ERROR > ${j.error || "Activation failed"}`);

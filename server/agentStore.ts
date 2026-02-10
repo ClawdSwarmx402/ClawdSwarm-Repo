@@ -12,6 +12,8 @@ export interface AgentDoc {
   persona?: string;
   mission: string;
   status: string;
+  swarmKey?: string;
+  linkCode?: string;
   moltbookAgentId?: string;
   moltbookApiKey?: string;
   claimUrl?: string;
@@ -26,6 +28,13 @@ export interface AgentDoc {
     backoffUntil?: Date;
     failures: number;
   };
+}
+
+export function generateLinkCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 8; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
 }
 
 function loadJson(): AgentDoc[] {
@@ -53,6 +62,7 @@ export async function initStore() {
         mission: String,
 
         status: { type: String, default: "draft" },
+        swarmKey: { type: String, index: true },
         moltbookAgentId: String,
 
         moltbookApiKey: String,
@@ -78,7 +88,6 @@ export async function initStore() {
     AgentModel = mongoose.model("Agent", schema);
     useMongo = true;
   } catch (e) {
-    console.warn("MongoDB not available, using JSON file storage");
   }
 }
 
@@ -114,6 +123,11 @@ export async function updateAgent(hash: string, patch: Partial<AgentDoc>): Promi
   const existing = await findByDeploymentHash(hash);
   if (!existing) return null;
   return upsertByDeploymentHash(hash, { ...existing, ...patch });
+}
+
+export async function findByLinkCode(code: string): Promise<AgentDoc | null> {
+  if (useMongo) return AgentModel.findOne({ linkCode: code }).lean();
+  return loadJson().find((a: AgentDoc) => a.linkCode === code) || null;
 }
 
 export async function listAgents(): Promise<AgentDoc[]> {
