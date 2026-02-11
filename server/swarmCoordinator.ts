@@ -77,8 +77,7 @@ class Coordinator {
     return Array.from(this.tasks.values());
   }
 
-  // TODO: build out full stats aggregation — need to include reward distribution totals
-  // and per-type breakdowns for the fleet analytics panel
+  // TODO: add expired count and totalRewardsDistributed once ledger wiring is done
   getStats(): { total: number; open: number; claimed: number; completed: number } {
     let open = 0, claimed = 0, completed = 0;
     for (const t of Array.from(this.tasks.values())) {
@@ -89,8 +88,24 @@ class Coordinator {
     return { total: this.tasks.size, open, claimed, completed };
   }
 
-  // TODO: seed initial tasks on startup — content generation, signal monitoring,
-  // data analysis, swarm votes with appropriate stage gates and reward tiers
+  seedTasksIfEmpty(): void {
+    if (this.tasks.size > 0) return;
+
+    const seeds: { type: TaskType; reward: number; desc: string; stage: MoltStage }[] = [
+      { type: TaskType.CONTENT_GENERATION, reward: 0.005, desc: "Generate a swarm status report for m/crab-rave", stage: MoltStage.Larva },
+      { type: TaskType.SIGNAL_MONITORING, reward: 0.008, desc: "Monitor trending submolts and report top 3 topics", stage: MoltStage.Larva },
+      { type: TaskType.DATA_ANALYSIS, reward: 0.012, desc: "Analyze posting patterns across the swarm fleet", stage: MoltStage.Juvenile },
+      { type: TaskType.SWARM_VOTE, reward: 0.003, desc: "Vote on next content strategy for m/crab-tech", stage: MoltStage.Larva },
+      { type: TaskType.CONTENT_GENERATION, reward: 0.015, desc: "Write an intro post for new swarm members", stage: MoltStage.Juvenile },
+      { type: TaskType.SIGNAL_MONITORING, reward: 0.020, desc: "Track x402 payment volume across the network", stage: MoltStage.SubAdult },
+      { type: TaskType.DATA_ANALYSIS, reward: 0.025, desc: "Compile weekly molt progression statistics", stage: MoltStage.SubAdult },
+      { type: TaskType.SWARM_VOTE, reward: 0.010, desc: "Propose and vote on swarm expansion targets", stage: MoltStage.Adult },
+    ];
+
+    for (const s of seeds) {
+      this.createTask(s.type, s.reward, s.desc, s.stage, 24 * 3600_000);
+    }
+  }
 }
 
 export const coordinator = new Coordinator();

@@ -34,7 +34,7 @@ export async function registerRoutes(
 
   await initStore();
   initLedger();
-  // TODO: seed initial coordination tasks
+  coordinator.seedTasksIfEmpty();
 
   // mount x402 payment protocol routes
   app.use(createX402Router());
@@ -434,34 +434,68 @@ export async function registerRoutes(
     }
   });
 
-  // TODO: fleet-level x402 analytics endpoint — aggregate earnings, tx counts,
-  // top earners across the entire swarm. Need to wire up paymentLedger
-  // aggregation and coordinator task stats.
   app.get("/api/fleet/analytics", async (_req, res) => {
     try {
       const allAgents = await listAgents();
-      // TODO: aggregate earnings from payment ledger per agent
-      // TODO: include coordinator task stats
+      const earningsMap = getAllAgentEarnings();
+
+      let totalEarnings = 0;
+      let totalTransactions = 0;
+      const agentEarnings: { name: string; hash: string; earnings: number; transactions: number; stage: string }[] = [];
+
+      for (const agent of allAgents) {
+        const earnings = earningsMap.get(agent.deploymentHash) || 0;
+        const txCount = getTransactionCount(agent.deploymentHash);
+        const molt = moltEngine.getMoltProgress(agent.deploymentHash);
+        totalEarnings += earnings;
+        totalTransactions += txCount;
+        agentEarnings.push({
+          name: agent.name,
+          hash: agent.deploymentHash,
+          earnings,
+          transactions: txCount,
+          stage: molt.stageName,
+        });
+      }
+
+      agentEarnings.sort((a, b) => b.earnings - a.earnings);
+
+      const taskStats = coordinator.getStats();
+
       return res.json({
         fleet: {
           totalAgents: allAgents.length,
-          totalEarnings: 0,
-          totalTransactions: 0,
-          topEarners: [],
+          totalEarnings: Number(totalEarnings.toFixed(6)),
+          totalTransactions,
+          topEarners: agentEarnings.slice(0, 5),
         },
-        tasks: { total: 0, open: 0, claimed: 0, completed: 0 },
+        tasks: taskStats,
       });
     } catch (e: any) {
       return res.status(500).json({ error: e.message });
     }
   });
 
-  // TODO: swarm task board endpoint — return active coordination tasks
-  // with rewards, deadlines, and stage requirements
+  // TODO: add task claiming endpoint (POST /api/fleet/tasks/:id/claim)
+  // TODO: add task completion endpoint with reward distribution
   app.get("/api/fleet/tasks", async (_req, res) => {
     try {
-      // TODO: pull from coordinator, filter open/claimed, sort by creation
-      return res.json({ tasks: [] });
+      const tasks = coordinator.getAllTasks()
+        .filter(t => t.status === "open" || t.status === "claimed")
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .slice(0, 20)
+        .map(t => ({
+          id: t.id,
+          type: t.type,
+          description: t.description,
+          reward: t.reward,
+          status: t.status,
+          requiredStage: t.requiredStage,
+          assignedAgent: t.assignedAgent,
+          deadline: t.deadline,
+        }));
+
+      return res.json({ tasks });
     } catch (e: any) {
       return res.status(500).json({ error: e.message });
     }
